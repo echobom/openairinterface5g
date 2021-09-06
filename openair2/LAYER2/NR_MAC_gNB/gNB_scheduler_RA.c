@@ -1577,6 +1577,39 @@ void nr_generate_Msg4(module_id_t module_idP, int CC_id, frame_t frameP, sub_fra
       BWPSize = type0_PDCCH_CSS_config->num_rbs;
     }
 
+    // Checking Msg4 data
+    uint8_t msg4_data[10240];
+    uint16_t msg4_len = mac_rrc_nr_data_req(module_idP, CC_id, frameP, CCCH, ra->rnti, 1, msg4_data);
+    if (msg4_len==0) {
+      LOG_I(NR_MAC,"No msg4, check DCCH message for Reestablishment %x\n",ra->rnti);
+        sched_ctrl->rlc_status[DL_SCH_LCID_DCCH] = mac_rlc_status_ind(module_idP,
+                                                        ra->rnti,
+                                                        module_idP,
+                                                        frameP,
+                                                        slotP,
+                                                        ENB_FLAG_YES,
+                                                        MBMS_FLAG_NO,
+                                                        DL_SCH_LCID_DCCH,
+                                                        0,
+                                                        0);
+        if (sched_ctrl->rlc_status[DL_SCH_LCID_DCCH].bytes_in_buffer>0){
+            msg4_len = mac_rlc_data_req(module_idP,
+                                   ra->rnti,
+                                   module_idP,
+                                   frameP,
+                                   ENB_FLAG_YES,
+                                   MBMS_FLAG_NO,
+                                   DL_SCH_LCID_DCCH,
+                                   sched_ctrl->rlc_status[DL_SCH_LCID_DCCH].bytes_in_buffer,
+                                   (char *)msg4_data,
+                                   0,
+                                   0);
+        } else {
+          AssertFatal(0==1,
+                      "Not found msg3. Illegal case.\n");
+        }
+    }
+
     /* get the PID of a HARQ process awaiting retrnasmission, or -1 otherwise */
     int current_harq_pid = sched_ctrl->retrans_dl_harq.head;
     // HARQ management
@@ -1641,7 +1674,8 @@ void nr_generate_Msg4(module_id_t module_idP, int CC_id, frame_t frameP, sub_fra
       } else {
         uint16_t mac_pdu_length = nr_write_ce_dlsch_pdu(module_idP, nr_mac->sched_ctrlCommon, buf, 255, ra->cont_res_id);
         LOG_D(NR_MAC,"Encoded contention resolution mac_pdu_length %d\n",mac_pdu_length);
-        uint16_t mac_sdu_length = mac_rrc_nr_data_req(module_idP, CC_id, frameP, CCCH, ra->rnti, 1, &buf[mac_pdu_length+2]);
+        uint16_t mac_sdu_length = msg4_len;
+        memcpy(&buf[mac_pdu_length+2],msg4_data,msg4_len);
         ((NR_MAC_SUBHEADER_SHORT *) &buf[mac_pdu_length])->R = 0;
         ((NR_MAC_SUBHEADER_SHORT *) &buf[mac_pdu_length])->F = 0;
         ((NR_MAC_SUBHEADER_SHORT *) &buf[mac_pdu_length])->LCID = DL_SCH_LCID_CCCH;
