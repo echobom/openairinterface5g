@@ -465,6 +465,7 @@ rrc_gNB_generate_RRCSetup_for_RRCReestablishmentRequest(
   NR_ServingCellConfigCommon_t *scc=rrc_instance_p->carrier.servingcellconfigcommon;
 
   ue_context_pP = rrc_gNB_get_next_free_ue_context(ctxt_pP, rrc_instance_p, 0);
+  ue_context_pP = rrc_gNB_get_ue_context(rrc_instance_p, ctxt_pP->rnti);
 
   gNB_RRC_UE_t *ue_p = &ue_context_pP->ue_context;
   ue_p->Srb0.Tx_buffer.payload_size = do_RRCSetup(ue_context_pP,
@@ -482,19 +483,6 @@ rrc_gNB_generate_RRCSetup_for_RRCReestablishmentRequest(
   LOG_D(NR_RRC,
           PROTOCOL_NR_RRC_CTXT_UE_FMT" RRC_gNB --- MAC_CONFIG_REQ  (SRB1) ---> MAC_gNB\n",
           PROTOCOL_NR_RRC_CTXT_UE_ARGS(ctxt_pP));
-
-  rrc_mac_config_req_gNB(rrc_instance_p->module_id,
-                         rrc_instance_p->configuration.ssb_SubcarrierOffset,
-                         rrc_instance_p->configuration.pdsch_AntennaPorts,
-                         rrc_instance_p->configuration.pusch_AntennaPorts,
-                         rrc_instance_p->configuration.sib1_tda,
-                         rrc_instance_p->configuration.minRXTXTIME,
-                         rrc_instance_p->carrier.servingcellconfigcommon,
-                         &rrc_instance_p->carrier.mib,
-                         rrc_instance_p->carrier.siblock1,
-                         0,
-                         ue_context_pP->ue_context.rnti,
-                         NULL);
 
   LOG_I(NR_RRC,
         PROTOCOL_NR_RRC_CTXT_UE_FMT" [RAPROC] Logical Channel DL-CCCH, Generating RRCSetup (bytes %d)\n",
@@ -516,6 +504,14 @@ rrc_gNB_generate_RRCSetup_for_RRCReestablishmentRequest(
   GNB_RRC_CCCH_DATA_IND (message_p).sdu = message_buffer;
   GNB_RRC_CCCH_DATA_IND (message_p).size  = ue_p->Srb0.Tx_buffer.payload_size;
   itti_send_msg_to_task (TASK_RRC_UE_SIM, ctxt_pP->instance, message_p);
+#else
+  // activate release timer, if RRCSetupComplete not received after 100 frames, remove UE
+  ue_context_pP->ue_context.ue_release_timer = 1;
+  // remove UE after 10 frames after RRCConnectionRelease is triggered
+  ue_context_pP->ue_context.ue_release_timer_thres = 1000;
+  // configure MAC
+  apply_macrlc_config(rrc_instance_p,ue_context_pP,ctxt_pP);
+  apply_pdcp_config(ue_context_pP,ctxt_pP);
 #endif
 }
 
@@ -601,6 +597,7 @@ rrc_gNB_process_RRCSetupComplete(
       PROTOCOL_NR_RRC_CTXT_UE_ARGS(ctxt_pP));
   ue_context_pP->ue_context.Srb1.Active = 1;
   ue_context_pP->ue_context.Srb1.Srb_info.Srb_id = 1;
+  ue_context_pP->ue_context.Srb2.Active = 0;
   ue_context_pP->ue_context.StatusRrc = NR_RRC_CONNECTED;
 
   if (AMF_MODE_ENABLED) {
@@ -2278,7 +2275,8 @@ int nr_rrc_gNB_decode_ccch(protocol_ctxt_t    *const ctxt_pP,
               }
             }
           }
-
+          // update rnti
+          ue_context_p->ue_context.rnti=c_rnti;
           LOG_D(NR_RRC,
                 PROTOCOL_NR_RRC_CTXT_UE_FMT" UE context: %p\n",
                 PROTOCOL_NR_RRC_CTXT_UE_ARGS(ctxt_pP),
