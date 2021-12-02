@@ -42,6 +42,7 @@
 
 #include "asn1_msg.h"
 #include "../nr_rrc_proto.h"
+#include "UTIL/OSA/osa_defs.h"
 #include "RRC/NR/nr_rrc_extern.h"
 #include "NR_DL-CCCH-Message.h"
 #include "NR_UL-CCCH-Message.h"
@@ -2180,17 +2181,18 @@ uint8_t do_RRCReestablishmentRequest(uint8_t Mod_id, uint8_t *buffer, uint16_t c
 
 //------------------------------------------------------------------------------
 uint8_t
-do_RRCReestablishment(
-const protocol_ctxt_t     *const ctxt_pP,
-rrc_gNB_ue_context_t      *const ue_context_pP,
-int                              CC_id,
-uint8_t                   *const buffer,
-//const uint8_t                    transmission_mode,
-const uint8_t                    Transaction_id,
-NR_SRB_ToAddModList_t               **SRB_configList,
-OCTET_STRING_t               *masterCellGroup_from_DU,
-NR_ServingCellConfigCommon_t *scc
-) {
+do_RRCReestablishment(const protocol_ctxt_t     *const ctxt_pP,
+                      rrc_gNB_ue_context_t      *const ue_context_pP,
+                      int                              CC_id,
+                      uint8_t                   *const buffer,
+                      //const uint8_t                    transmission_mode,
+                      const uint8_t                    Transaction_id,
+                      NR_SRB_ToAddModList_t               **SRB_configList,
+                      OCTET_STRING_t               *masterCellGroup_from_DU,
+                      NR_ServingCellConfigCommon_t *scc,
+                      rrc_gNB_carrier_data_t *carrier)
+//------------------------------------------------------------------------------
+{
     asn_enc_rval_t enc_rval;
     //long *logicalchannelgroup = NULL;
     struct NR_SRB_ToAddMod *SRB1_config = NULL;
@@ -2265,7 +2267,7 @@ NR_ServingCellConfigCommon_t *scc
     }
     else {
       cellGroupConfig = calloc(1, sizeof(NR_CellGroupConfig_t));
-      fill_initial_cellGroupConfig(ue_context_pP->ue_context.rnti,cellGroupConfig,scc);
+      fill_initial_cellGroupConfig(ue_context_pP->ue_context.rnti,cellGroupConfig,scc,carrier);
 
       enc_rval = uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig,
 				       NULL,

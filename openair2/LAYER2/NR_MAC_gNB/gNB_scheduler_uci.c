@@ -1459,7 +1459,6 @@ void nr_sr_reporting(int Mod_idP, frame_t SFN, sub_frame_t slot)
       LOG_D(NR_MAC,"pucch is NULL skip SR scheduling %d\n",UE_id);
       continue;
     }
-    else continue;
     if (!pucch_Config->schedulingRequestResourceToAddModList) continue;
     AssertFatal(pucch_Config->schedulingRequestResourceToAddModList->list.count>0,"NO SR configuration available");
 

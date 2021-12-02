@@ -205,3 +205,13 @@ void
 rrc_gNB_generate_dedicatedRRCReconfiguration(
     const protocol_ctxt_t     *const ctxt_pP,
     rrc_gNB_ue_context_t      *ue_context_pP);
+
+
+int
+rrc_gNB_generate_pcch_msg(
+    uint32_t tmsi,
+    uint8_t paging_drx,
+    instance_t instance,
+    uint8_t CC_id);
+
+  

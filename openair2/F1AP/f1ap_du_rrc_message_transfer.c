@@ -1005,7 +1005,7 @@ int DU_handle_DL_NR_RRC_MESSAGE_TRANSFER(instance_t       instance,
 
   uint64_t        cu_ue_f1ap_id;
   uint64_t        du_ue_f1ap_id;
-  uint64_t        old_du_ue_f1ap_id;
+  uint64_t        old_du_ue_f1ap_id=0;
   uint64_t        srb_id;
   int             executeDuplication;
   sdu_size_t      rrc_dl_sdu_len;
