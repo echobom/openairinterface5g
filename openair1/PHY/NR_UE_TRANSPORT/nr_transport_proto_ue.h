@@ -707,7 +707,8 @@ unsigned short nr_dlsch_extract_rbs_single(int **rxdataF,
                                         unsigned short nb_rb_pdsch,
                                         uint8_t n_dmrs_cdm_groups,
                                         NR_DL_FRAME_PARMS *frame_parms,
-                                        uint16_t dlDmrsSymbPos);
+                                        uint16_t dlDmrsSymbPos,
+                                        int chest_time_type);
 
 /** \fn dlsch_extract_rbs_multiple(int32_t **rxdataF,
     int32_t **dl_ch_estimates,
@@ -745,7 +746,8 @@ void nr_dlsch_extract_rbs(int **rxdataF,
                                         uint8_t n_dmrs_cdm_groups,
                                         uint8_t Nl,
                                         NR_DL_FRAME_PARMS *frame_parms,
-                                        uint16_t dlDmrsSymbPos);
+                                        uint16_t dlDmrsSymbPos,
+                                        int chest_time_type);
 
 /** \fn dlsch_extract_rbs_TM7(int32_t **rxdataF,
     int32_t **dl_bf_ch_estimates,
