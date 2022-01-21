@@ -62,7 +62,6 @@
 #define CONFIG_STRING_MACRLC_PUSCHFAILURETHRES             "pusch_FailureThres"
 #define CONFIG_STRING_MACRLC_DL_BLER_TARGET_UPPER          "dl_bler_target_upper"
 #define CONFIG_STRING_MACRLC_DL_BLER_TARGET_LOWER          "dl_bler_target_lower"
-#define CONFIG_STRING_MACRLC_DL_RD2_BLER_THRESHOLD         "dl_rd2_bler_threshold"
 #define CONFIG_STRING_MACRLC_DL_MAX_MCS                    "dl_max_mcs"
 
 
@@ -95,7 +94,6 @@
 {CONFIG_STRING_MACRLC_PUSCHFAILURETHRES,                 NULL,     0,          iptr:NULL,           defintval:10,              TYPE_INT,      0},        \
 {CONFIG_STRING_MACRLC_DL_BLER_TARGET_UPPER,   "Upper threshold of BLER to decrease DL MCS",   0, dblptr:NULL,  defdblval:0.15,  TYPE_DOUBLE,  0},        \
 {CONFIG_STRING_MACRLC_DL_BLER_TARGET_LOWER,   "Lower threshold of BLER to increase DL MCS",   0, dblptr:NULL,  defdblval:0.05,  TYPE_DOUBLE,  0},        \
-{CONFIG_STRING_MACRLC_DL_RD2_BLER_THRESHOLD,  "Threshold of RD2/RETX2 BLER to decrease DL MCS", 0, dblptr:NULL,  defdblval:0.01,  TYPE_DOUBLE,  0},      \
 {CONFIG_STRING_MACRLC_DL_MAX_MCS,             "Maximum DL MCS that should be used", 0, u8ptr:NULL,  defintval:28,  TYPE_UINT8,  0},      \
 }
 #define MACRLC_CC_IDX                                          0
@@ -122,8 +120,7 @@
 #define MACRLC_PUSCHFAILURETHRES_IDX                           21
 #define MACRLC_DL_BLER_TARGET_UPPER_IDX                        22
 #define MACRLC_DL_BLER_TARGET_LOWER_IDX                        23
-#define MACRLC_DL_RD2_BLER_THRESHOLD_IDX                       24
-#define MACRLC_DL_MAX_MCS_IDX                                  25
+#define MACRLC_DL_MAX_MCS_IDX                                  24
 
 /*---------------------------------------------------------------------------------------------------------------------------------------------------------*/
 #endif
