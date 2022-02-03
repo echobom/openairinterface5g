@@ -38,11 +38,8 @@ RUN rm -Rf /oai-ran
 WORKDIR /oai-ran
 COPY . .
 
-#run build_oai to build the target image(s)
-#note that we compile aw2sori separately as -w takes only one parameter
+#run build_oai to build the target image
 RUN /bin/sh oaienv && \ 
     cd cmake_targets && \
     mkdir -p log && \
-    ./build_oai --eNB --gNB --RU --UE --nrUE --ninja -w USRP --verbose-ci && \
-    cd ran_build/build && \
-    ninja aw2sori_transpro
+    ./build_oai --eNB --gNB --RU --UE --nrUE --ninja -w USRP --verbose-ci
