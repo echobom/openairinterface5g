@@ -25,20 +25,18 @@
 #
 #---------------------------------------------------------------------
 
+FROM ran-base:latest AS gnb-base
+
 FROM ran-build:latest AS gnb-build
 
-RUN rm -Rf /oai-ran
+# build AW2S fronthaul lib
 WORKDIR /oai-ran
-COPY . .
+RUN /bin/sh oaienv && \
+    cd cmake_targets/ran_build/build && \
+    ninja aw2sori_transpro
 
-#run build_oai to build the target image
-RUN /bin/cp libori.so /usr/local/lib && \
-    /bin/sh oaienv && \ 
-    cd cmake_targets && \
-    mkdir -p log && \
-    ./build_oai --gNB --ninja -w AW2SORI --verbose-ci
-
-RUN python3 ./docker/scripts/generateTemplate.py ./docker/scripts/gnb_parameters.yaml
+RUN python3 ./docker/scripts/generateTemplate.py ./docker/scripts/gnb_parameters.yaml && \
+    cp /oai-ran/docker/scripts/gnb_entrypoint.sh /oai-ran/docker/scripts/entrypoint.sh
 
 #start from scratch for target executable
 FROM registry.access.redhat.com/ubi8/ubi:latest as oai-gnb-aw2s
@@ -54,8 +52,6 @@ RUN yum repolist --disablerepo=* && \
         lksctp-tools \
         nettle \
         tzdata \
-        python3 \
-        python3-pip \
         net-tools \
         iputils \
         libyaml && \
@@ -64,36 +60,40 @@ RUN yum repolist --disablerepo=* && \
     echo "/usr/local/lib" > /etc/ld.so.conf.d/local-lib.conf && \
     echo "/usr/local/lib64" >> /etc/ld.so.conf.d/local-lib.conf
 
+COPY libori.so /usr/local/lib
+
 WORKDIR /opt/oai-gnb-aw2s/bin
-COPY --from=gnb-build /oai-ran/targets/bin/nr-softmodem.Rel15 .
-COPY --from=gnb-build /oai-ran/docker/scripts/gnb_entrypoint.sh entrypoint.sh
+COPY --from=gnb-build \
+    /oai-ran/targets/bin/nr-softmodem.Rel15 \
+    /oai-ran/docker/scripts/entrypoint.sh \
+    ./
 
-WORKDIR /usr/local/lib/
-COPY --from=gnb-build /oai-ran/targets/bin/liboai_eth_transpro.so.Rel15 .
-COPY --from=gnb-build /oai-ran/targets/bin/libtcp_bridge_oai.so.Rel15 .
-COPY --from=gnb-build /oai-ran/targets/bin/librfsimulator.so.Rel15 .
-COPY --from=gnb-build /oai-ran/targets/bin/libaw2sori_transpro.so.Rel15 .
-COPY --from=gnb-build /oai-ran/targets/bin/libcoding.so .
-COPY --from=gnb-build /oai-ran/targets/bin/libparams_libconfig.so .
-COPY --from=gnb-build /oai-ran/cmake_targets/ran_build/build/libdfts.so .
-COPY --from=gnb-build /oai-ran/cmake_targets/ran_build/build/libldpc.so .
-COPY --from=gnb-build /oai-ran/cmake_targets/ran_build/build/libldpc_optim.so .
-COPY --from=gnb-build /oai-ran/cmake_targets/ran_build/build/libldpc_optim8seg.so .
-COPY --from=gnb-build /oai-ran/cmake_targets/ran_build/build/libldpc_orig.so .
+COPY --from=gnb-build \
+    /oai-ran/cmake_targets/ran_build/build/liboai_eth_transpro.so \
+    /oai-ran/cmake_targets/ran_build/build/libtcp_bridge_oai.so \
+    /oai-ran/cmake_targets/ran_build/build/librfsimulator.so \
+    /oai-ran/cmake_targets/ran_build/build/libaw2sori_transpro.so \
+    /oai-ran/cmake_targets/ran_build/build/libcoding.so \
+    /oai-ran/cmake_targets/ran_build/build/libparams_libconfig.so \
+    /oai-ran/cmake_targets/ran_build/build/libdfts.so \
+    /oai-ran/cmake_targets/ran_build/build/libldpc.so \
+    /oai-ran/cmake_targets/ran_build/build/libldpc_optim.so \
+    /oai-ran/cmake_targets/ran_build/build/libldpc_optim8seg.so \
+    /oai-ran/cmake_targets/ran_build/build/libldpc_orig.so \
+    /usr/local/lib/
 
-RUN /bin/bash -c "ln -s /usr/local/lib/liboai_eth_transpro.so.Rel15 /usr/local/lib/liboai_transpro.so"
-RUN /bin/bash -c "ln -s /usr/local/lib/liboai_rfsimulator.so.Rel15 /usr/local/lib/liboai_device.so"
-RUN /bin/bash -c "ln -s /usr/local/lib/librfsimulator.so.Rel15 /usr/local/lib/librfsimulator.so"
-RUN /bin/bash -c "ln -s /usr/local/lib/libaw2sori_transpro.so.Rel15 /usr/local/lib/libthirdparty_transpro.so"
-COPY --from=gnb-build /usr/local/lib/libprotobuf-c.so.1 .
+COPY --from=gnb-base \
+    /lib64/libconfig.so.9 \
+    /lib64/libforms.so.2 \
+    /lib64/libblas.so.3 \
+    /lib64/liblapack.so.3 \
+    /lib64/liblapacke.so.3 \
+    /lib64/
 
-COPY --from=gnb-build /lib64/libconfig.so.9 /lib64
-COPY --from=gnb-build /lib64/libforms.so.2 /lib64
-COPY --from=gnb-build /lib64/libblas.so.3 /lib64
-COPY --from=gnb-build /lib64/liblapack.so.3 /lib64
-COPY --from=gnb-build /lib64/liblapacke.so.3 /lib64
+COPY --from=gnb-base /usr/local/lib/libprotobuf-c.so.1 /usr/local/lib
 
-RUN ldconfig
+RUN ln -s /usr/local/lib/libaw2sori_transpro.so /usr/local/lib/libthirdparty_transpro.so && \
+    ldconfig
 
 # Copy the relevant configuration files for gNB
 WORKDIR /opt/oai-gnb-aw2s/etc
