@@ -36,6 +36,8 @@ COPY ./etc-pki-entitlement /etc/pki/entitlement
 COPY ./rhsm-conf /etc/rhsm
 COPY ./rhsm-ca /etc/rhsm/ca
 
+COPY ./libori.so /usr/local/lib
+
 # build AW2S fronthaul lib
 WORKDIR /oai-ran
 RUN /bin/sh oaienv && \
@@ -61,13 +63,12 @@ RUN yum repolist --disablerepo=* && \
         tzdata \
         net-tools \
         iputils \
+        python3-pip \
         libyaml && \
     pip3 install six && \
     pip3 install requests && \
     echo "/usr/local/lib" > /etc/ld.so.conf.d/local-lib.conf && \
     echo "/usr/local/lib64" >> /etc/ld.so.conf.d/local-lib.conf
-
-COPY ./libori.so /usr/local/lib
 
 WORKDIR /opt/oai-gnb-aw2s/bin
 COPY --from=gnb-build \
