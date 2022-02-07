@@ -347,7 +347,13 @@ void nr_preprocessor_phytest(module_id_t module_id,
               __func__,
               UE_id);
 
-  const int alloc = nr_acknack_scheduling(module_id, UE_id, frame, slot, -1, 0);
+  int n_rb,rb_offset;
+  get_coreset_rballoc(sched_ctrl->coreset->frequencyDomainResources.buf,&n_rb,&rb_offset);
+  const uint16_t N_cce = n_rb * sched_ctrl->coreset->duration / NR_NB_REG_PER_CCE;
+  const int delta_PRI=0;
+  int r_pucch = ((sched_ctrl->cce_index<<1)/N_cce)+(delta_PRI<<1);
+
+  const int alloc = nr_acknack_scheduling(module_id, UE_id, frame, slot, r_pucch, 0);
   if (alloc < 0) {
     LOG_D(MAC,
           "%s(): could not find PUCCH for UE %d/%04x@%d.%d\n",
@@ -373,11 +379,14 @@ void nr_preprocessor_phytest(module_id_t module_id,
   sched_pdsch->rbStart = rbStart;
   sched_pdsch->rbSize = rbSize;
   const int tda = sched_ctrl->active_bwp ? RC.nrmac[module_id]->preferred_dl_tda[sched_ctrl->active_bwp->bwp_Id][slot] : 1;
-  const long f = sched_ctrl->active_bwp ? sched_ctrl->search_space->searchSpaceType->choice.ue_Specific->dci_Formats : 0;
+  const long f = (sched_ctrl->active_bwp && sched_ctrl->search_space &&
+                  sched_ctrl->search_space->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_ue_Specific) ?
+                 sched_ctrl->search_space->searchSpaceType->choice.ue_Specific->dci_Formats : 0;
+
   ps->nrOfLayers = target_dl_Nl;
   if (ps->time_domain_allocation != tda)
     nr_set_pdsch_semi_static(
-        scc, UE_info->CellGroup[UE_id], sched_ctrl->active_bwp, NULL, tda, f, ps);
+        module_id, scc, UE_info->CellGroup[UE_id], sched_ctrl->active_bwp, NULL, tda, f, ps);
 
   sched_pdsch->mcs = target_dl_mcs;
   sched_pdsch->Qm = nr_get_Qm_dl(sched_pdsch->mcs, ps->mcsTableIdx);
@@ -434,7 +443,7 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, sub_frame_
               "time domain assignment %d >= %d\n",
               tda,
               tdaList->list.count);
-  int K2 = get_K2(scc,sched_ctrl->active_ubwp, tda, mu);
+  int K2 = get_K2(scc,NULL,sched_ctrl->active_ubwp, tda, mu);
   const int sched_frame = frame + (slot + K2 >= nr_slots_per_frame[mu]);
   const int sched_slot = (slot + K2) % nr_slots_per_frame[mu];
   /* check if slot is UL, and that slot is 8 (assuming K2=6 because of UE
@@ -443,7 +452,9 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, sub_frame_
   if (!is_xlsch_in_slot(ulsch_slot_bitmap, sched_slot))
     return false;
 
-  const long f = sched_ctrl->search_space->searchSpaceType->choice.ue_Specific->dci_Formats;
+  const long f = (sched_ctrl->active_bwp && sched_ctrl->search_space &&
+                  sched_ctrl->search_space->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_ue_Specific) ?
+                    sched_ctrl->search_space->searchSpaceType->choice.ue_Specific->dci_Formats : 0;
   const int dci_format = f ? NR_UL_DCI_FORMAT_0_1 : NR_UL_DCI_FORMAT_0_0;
   const uint8_t num_dmrs_cdm_grps_no_data = 1;
   /* we want to avoid a lengthy deduction of DMRS and other parameters in
@@ -453,7 +464,7 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, sub_frame_
   if (ps->time_domain_allocation != tda
       || ps->dci_format != dci_format
       || ps->num_dmrs_cdm_grps_no_data != num_dmrs_cdm_grps_no_data)
-    nr_set_pusch_semi_static(scc, sched_ctrl->active_ubwp, NULL,dci_format, tda, num_dmrs_cdm_grps_no_data, ps);
+    nr_set_pusch_semi_static(module_id, scc, sched_ctrl->active_ubwp, NULL,dci_format, tda, num_dmrs_cdm_grps_no_data, ps);
 
   uint16_t rbStart = 0;
   uint16_t rbSize;

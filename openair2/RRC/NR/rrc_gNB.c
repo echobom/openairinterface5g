@@ -194,16 +194,16 @@ static void init_NR_SI(gNB_RRC_INST *rrc, gNB_RrcConfigurationReq *configuration
 
   if (NODE_IS_MONOLITHIC(rrc->node_type)){
     rrc_mac_config_req_gNB(rrc->module_id,
-			   rrc->carrier.ssb_SubcarrierOffset,
-			   rrc->carrier.pdsch_AntennaPorts,
-			   rrc->carrier.pusch_AntennaPorts,
+                           rrc->carrier.ssb_SubcarrierOffset,
+                           rrc->carrier.pdsch_AntennaPorts,
+                           rrc->carrier.pusch_AntennaPorts,
                            rrc->carrier.sib1_tda,
-			   (NR_ServingCellConfigCommon_t *)rrc->carrier.servingcellconfigcommon,
-			   &rrc->carrier.mib,
-			   0,
-			   0, // WIP hardcoded rnti
-			   (NR_CellGroupConfig_t *)NULL
-			   );
+                           (NR_ServingCellConfigCommon_t *)rrc->carrier.servingcellconfigcommon,
+                           &rrc->carrier.mib,
+                           rrc->carrier.siblock1,
+                           0,
+                           0, // WIP hardcoded rnti
+                           (NR_CellGroupConfig_t *)NULL);
   }
 
   /* set flag to indicate that cell information is configured. This is required
@@ -305,16 +305,17 @@ void apply_macrlc_config(gNB_RRC_INST *rrc,
                          rrc_gNB_ue_context_t         *const ue_context_pP,
                          const protocol_ctxt_t        *const ctxt_pP ) {
 
-      rrc_mac_config_req_gNB(rrc->module_id,
-			     rrc->carrier.ssb_SubcarrierOffset,
-			     rrc->carrier.pdsch_AntennaPorts,
-			     rrc->carrier.pusch_AntennaPorts,
-			     rrc->carrier.sib1_tda,
-			     NULL,
-                             NULL,
-			     0,
-			     ue_context_pP->ue_context.rnti,
-			     get_softmodem_params()->sa ? ue_context_pP->ue_context.masterCellGroup : (NR_CellGroupConfig_t *)NULL);
+  rrc_mac_config_req_gNB(rrc->module_id,
+                         rrc->carrier.ssb_SubcarrierOffset,
+                         rrc->carrier.pdsch_AntennaPorts,
+                         rrc->carrier.pusch_AntennaPorts,
+                         rrc->carrier.sib1_tda,
+                         NULL,
+                         NULL,
+                         NULL,
+                         0,
+                         ue_context_pP->ue_context.rnti,
+                         get_softmodem_params()->sa ? ue_context_pP->ue_context.masterCellGroup : (NR_CellGroupConfig_t *)NULL);
 
       nr_rrc_rlc_config_asn1_req(ctxt_pP,
                                  ue_context_pP->ue_context.SRB_configList,
@@ -334,6 +335,7 @@ void apply_macrlc_config_reest(gNB_RRC_INST *rrc,
                              rrc->carrier.pdsch_AntennaPorts,
                              rrc->carrier.pusch_AntennaPorts,
                              rrc->carrier.sib1_tda,
+                             NULL,
                              NULL,
                              NULL,
                              0,
@@ -1289,6 +1291,7 @@ rrc_gNB_process_RRCReconfigurationComplete(
                            rrc->carrier.pdsch_AntennaPorts,
                            rrc->carrier.pusch_AntennaPorts,
                            rrc->carrier.sib1_tda,
+                           NULL,
                            NULL,
                            NULL,
                            0,
