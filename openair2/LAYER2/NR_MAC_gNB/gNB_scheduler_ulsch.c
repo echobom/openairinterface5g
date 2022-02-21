@@ -599,7 +599,7 @@ void handle_nr_ul_harq(const int CC_idP,
           harq_pid,
           crc_pdu->rnti);
     add_tail_nr_list(&sched_ctrl->available_ul_harq, harq_pid);
-  } else if (harq->round >=  MAX_UL_HARQ_ROUNDS - 1) {
+  } else if (harq->round >= MAX_UL_HARQ_ROUNDS - 1) {
     abort_nr_ul_harq(mod_id, UE_id, harq_pid);
     LOG_D(NR_MAC,
           "RNTI %04x: Ulharq id %d crc failed in all rounds\n",
