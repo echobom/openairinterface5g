@@ -1052,7 +1052,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
           TBS,
           current_harq_pid,
           harq->round,
-          nr_rv_round_map[harq->round],
+          nr_rv_round_map[harq->round%4],
           harq->ndi,
           pucch->timing_indicator,
           pucch->frame,
@@ -1113,8 +1113,8 @@ void nr_schedule_ue_spec(module_id_t module_id,
     pdsch_pdu->mcsIndex[0] = sched_pdsch->mcs;
     pdsch_pdu->mcsTable[0] = ps->mcsTableIdx;
     AssertFatal(harq!=NULL,"harq is null\n");
-    AssertFatal(harq->round<4,"%d",harq->round);
-    pdsch_pdu->rvIndex[0] = nr_rv_round_map[harq->round];
+    AssertFatal(harq->round<MAX_DL_HARQ_ROUNDS,"%d",harq->round);
+    pdsch_pdu->rvIndex[0] = nr_rv_round_map[harq->round%4];
     pdsch_pdu->TBSize[0] = TBS;
 
     pdsch_pdu->dataScramblingId = *scc->physCellId;

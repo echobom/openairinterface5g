@@ -75,7 +75,8 @@
 #define MAX_NUM_BWP 2
 #define MAX_NUM_CORESET 12
 #define MAX_NUM_CCE 90
-#define MAX_HARQ_ROUNDS 4
+#define MAX_DL_HARQ_ROUNDS 10
+#define MAX_UL_HARQ_ROUNDS 4
 /*!\brief Maximum number of random access process */
 #define NR_NB_RA_PROC_MAX 4
 #define MAX_NUM_OF_SSB 64
