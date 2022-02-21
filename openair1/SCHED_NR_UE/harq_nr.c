@@ -343,10 +343,12 @@ void downlink_harq_process(NR_DL_UE_HARQ_t *dl_harq, int harq_pid, int ndi, int 
       case 0:
         dl_harq->round = 0;
         dl_harq->status = ACTIVE;
-        dl_harq->first_rx = 1;
-        if (dl_harq->DCINdi == ndi)
-          LOG_E(PHY,"Warning! rv %d indicates new transmission but new ndi %d is the same as old ndi %d\n",rv,ndi,dl_harq->DCINdi);
-        dl_harq->DCINdi = ndi;
+        dl_harq->first_rx = 0;
+        if (dl_harq->DCINdi != ndi) {
+          dl_harq->first_rx = 1;
+          // LOG_E(PHY,"Warning! rv %d indicates new transmission but new ndi %d is the same as old ndi %d\n",rv,ndi,dl_harq->DCINdi);
+          dl_harq->DCINdi = ndi;
+        }
         break;
       case 1:
         dl_harq->round = 3;
