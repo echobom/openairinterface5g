@@ -823,6 +823,7 @@ typedef struct gNB_MAC_INST_s {
 
   bool first_MIB;
   NR_bler_options_t dl_bler;
+  NR_bler_options_t ul_bler;
 } gNB_MAC_INST;
 
 #endif /*__LAYER2_NR_MAC_GNB_H__ */
