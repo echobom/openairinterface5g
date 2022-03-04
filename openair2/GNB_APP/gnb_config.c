@@ -825,6 +825,10 @@ void RCconfig_nr_macrlc() {
       dl_bler_options->upper = *(MacRLC_ParamList.paramarray[j][MACRLC_DL_BLER_TARGET_UPPER_IDX].dblptr);
       dl_bler_options->lower = *(MacRLC_ParamList.paramarray[j][MACRLC_DL_BLER_TARGET_LOWER_IDX].dblptr);
       dl_bler_options->max_mcs = *(MacRLC_ParamList.paramarray[j][MACRLC_DL_MAX_MCS_IDX].u8ptr);
+      NR_bler_options_t *ul_bler_options = &RC.nrmac[j]->ul_bler;
+      ul_bler_options->upper = *(MacRLC_ParamList.paramarray[j][MACRLC_UL_BLER_TARGET_UPPER_IDX].dblptr);
+      ul_bler_options->lower = *(MacRLC_ParamList.paramarray[j][MACRLC_UL_BLER_TARGET_LOWER_IDX].dblptr);
+      ul_bler_options->max_mcs = *(MacRLC_ParamList.paramarray[j][MACRLC_UL_MAX_MCS_IDX].u8ptr);
       RC.nrmac[j]->num_ulprbbl = num_prbbl;
       LOG_I(NR_MAC,"Blacklisted PRBS %d\n",num_prbbl);
       memcpy(RC.nrmac[j]->ulprbbl,prbbl,275*sizeof(prbbl[0]));
