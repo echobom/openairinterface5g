@@ -597,6 +597,9 @@ typedef struct {
   NR_pdsch_semi_static_t pdsch_semi_static;
   /// Sched PDSCH: scheduling decisions, copied into HARQ and cleared every TTI
   NR_sched_pdsch_t sched_pdsch;
+  /// UE-estimated maximum MCS (from CSI-RS)
+  uint8_t dl_max_mcs;
+
   /// For UL synchronization: store last UL scheduling grant
   frame_t last_ul_frame;
   sub_frame_t last_ul_slot;
@@ -627,7 +630,6 @@ typedef struct {
   bool SR;
   bool update_pdsch_ps;
   bool update_pusch_ps;
-  bool set_mcs;
   /// information about every HARQ process
   NR_UE_harq_t harq_processes[NR_MAX_NB_HARQ_PROCESSES];
   /// HARQ processes that are free
