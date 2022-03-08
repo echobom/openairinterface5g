@@ -86,23 +86,21 @@ void calculate_preferred_dl_tda(module_id_t module_id, const NR_BWP_Downlink_t *
   else {
     target_ss = NR_SearchSpace__searchSpaceType_PR_common;
   }
-  NR_SearchSpace_t *search_space = get_searchspace(module_id, scc, bwp ? bwp->bwp_Dedicated : NULL, target_ss);
+  NR_SearchSpace_t *search_space = get_searchspace(nrmac->common_channels[0].sib1 ? nrmac->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL,
+                                                   scc,
+                                                   bwp ? bwp->bwp_Dedicated : NULL,
+                                                   target_ss);
+
   NR_ControlResourceSet_t *coreset = get_coreset(module_id, scc, bwp ? bwp->bwp_Dedicated : NULL, search_space, target_ss);
   // get coreset symbol "map"
   const uint16_t symb_coreset = (1 << coreset->duration) - 1;
 
-  /* check that TDA index 0 fits into DL and does not overlap CORESET */
-  NR_PDSCH_TimeDomainResourceAllocationList_t *tdaList = NULL;
-  if (bwp) {
-    tdaList = bwp->bwp_Common->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList;
-  } else if (scc) {
-    tdaList = scc->downlinkConfigCommon->initialDownlinkBWP->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList;
-  } else {
-    NR_SIB1_t *sib1 = RC.nrmac[module_id]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1;
-    tdaList = sib1->servingCellConfigCommon->downlinkConfigCommon.initialDownlinkBWP.pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList;
-  }
-
+  NR_PDSCH_TimeDomainResourceAllocationList_t *tdaList = get_pdsch_TimeDomainAllocationList(bwp,
+                                                                                            scc,
+                                                                                            nrmac->common_channels[0].sib1 ? (const NR_SIB1_t *)nrmac->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL);
   AssertFatal(tdaList->list.count >= 1, "need to have at least one TDA for DL slots\n");
+
+  /* check that TDA index 0 fits into DL and does not overlap CORESET */
   const NR_PDSCH_TimeDomainResourceAllocation_t *tdaP_DL = tdaList->list.array[0];
   AssertFatal(!tdaP_DL->k0 || *tdaP_DL->k0 == 0,
               "TimeDomainAllocation at index 1: non-null k0 (%ld) is not supported by the scheduler\n",
@@ -400,11 +398,16 @@ int nr_write_ce_dlsch_pdu(module_id_t module_idP,
 
 #define BLER_UPDATE_FRAME 10
 #define BLER_FILTER 0.9f
-int get_mcs_from_bler(module_id_t mod_id, int CC_id, frame_t frame, sub_frame_t slot, int UE_id)
+int get_mcs_from_bler(module_id_t mod_id, int CC_id, frame_t frame, sub_frame_t slot, int UE_id, int mcs_table)
 {
   gNB_MAC_INST *nrmac = RC.nrmac[mod_id];
   const NR_ServingCellConfigCommon_t *scc = nrmac->common_channels[CC_id].ServingCellConfigCommon;
   const int n = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
+
+  int max_allowed_mcs = (mcs_table == 1) ? 27 : 28;
+  int max_mcs = nrmac->dl_max_mcs;
+  if (nrmac->dl_max_mcs>max_allowed_mcs)
+    max_mcs = max_allowed_mcs;
 
   NR_DL_bler_stats_t *bler_stats = &nrmac->UE_info.UE_sched_ctrl[UE_id].dl_bler_stats;
   /* first call: everything is zero. Initialize to sensible default */
@@ -451,7 +454,7 @@ int get_mcs_from_bler(module_id_t mod_id, int CC_id, frame_t frame, sub_frame_t 
   if (bler_stats->rd2_bler > nrmac->dl_rd2_bler_threshold && old_mcs > 6) {
     new_mcs -= 2;
   } else if (bler_stats->rd2_bler < nrmac->dl_rd2_bler_threshold) {*/
-  if (bler_stats->bler < nrmac->dl_bler_target_lower && old_mcs < nrmac->dl_max_mcs && dtx > 9)
+  if (bler_stats->bler < nrmac->dl_bler_target_lower && old_mcs < max_mcs && dtx > 9)
     new_mcs += 1;
   else if (bler_stats->bler > nrmac->dl_bler_target_upper && old_mcs > 6)
     new_mcs -= 1;
@@ -502,7 +505,7 @@ void nr_store_dlsch_buffer(module_id_t module_id,
                                                         DL_SCH_LCID_DCCH,
                                                         0,
                                                         0);
-    if ((sched_ctrl->lcid_mask&(1<<4)) > 0) {
+    if ((sched_ctrl->lcid_mask&(1<<4)) > 0) {  
        start_meas(&RC.nrmac[module_id]->rlc_status_ind);
        sched_ctrl->rlc_status[DL_SCH_LCID_DTCH] = mac_rlc_status_ind(module_id,
                                                                     rnti,
@@ -517,13 +520,13 @@ void nr_store_dlsch_buffer(module_id_t module_id,
        stop_meas(&RC.nrmac[module_id]->rlc_status_ind);
     }
     if(sched_ctrl->rlc_status[DL_SCH_LCID_DCCH].bytes_in_buffer > 0){
-      lcid = DL_SCH_LCID_DCCH;
-    }
+      lcid = DL_SCH_LCID_DCCH;       
+    } 
     else if (sched_ctrl->rlc_status[DL_SCH_LCID_DCCH1].bytes_in_buffer > 0)
     {
-      lcid = DL_SCH_LCID_DCCH1;
+      lcid = DL_SCH_LCID_DCCH1;       
     }else{
-      lcid = DL_SCH_LCID_DTCH;
+      lcid = DL_SCH_LCID_DTCH;       
     }
                                                       
     sched_ctrl->num_total_bytes += sched_ctrl->rlc_status[lcid].bytes_in_buffer;
@@ -554,8 +557,9 @@ bool allocate_dl_retransmission(module_id_t module_id,
                                 int UE_id,
                                 int current_harq_pid) {
 
-  const NR_ServingCellConfigCommon_t *scc = RC.nrmac[module_id]->common_channels->ServingCellConfigCommon;
-  NR_UE_info_t *UE_info = &RC.nrmac[module_id]->UE_info;
+  gNB_MAC_INST *nr_mac = RC.nrmac[module_id];
+  const NR_ServingCellConfigCommon_t *scc = nr_mac->common_channels->ServingCellConfigCommon;
+  NR_UE_info_t *UE_info = &nr_mac->UE_info;
   NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
   NR_sched_pdsch_t *retInfo = &sched_ctrl->harq_processes[current_harq_pid].sched_pdsch;
   NR_CellGroupConfig_t *cg = UE_info->CellGroup[UE_id];
@@ -573,15 +577,9 @@ bool allocate_dl_retransmission(module_id_t module_id,
       cg->spCellConfig->spCellConfigDedicated->uplinkConfig ?
       cg->spCellConfig->spCellConfigDedicated->uplinkConfig->initialUplinkBWP : NULL;
 
-  NR_BWP_t *genericParameters = NULL;
-  if(sched_ctrl->active_bwp) {
-    genericParameters = &sched_ctrl->active_bwp->bwp_Common->genericParameters;
-  } else if(RC.nrmac[module_id]->common_channels[0].ServingCellConfigCommon) {
-    genericParameters = &RC.nrmac[module_id]->common_channels[0].ServingCellConfigCommon->downlinkConfigCommon->initialDownlinkBWP->genericParameters;
-  } else {
-    NR_SIB1_t *sib1 = RC.nrmac[module_id]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1;
-    genericParameters = &sib1->servingCellConfigCommon->downlinkConfigCommon.initialDownlinkBWP.genericParameters;
-  }
+  NR_BWP_t *genericParameters = get_dl_bwp_genericParameters(sched_ctrl->active_bwp,
+                                                             RC.nrmac[module_id]->common_channels[0].ServingCellConfigCommon,
+                                                             RC.nrmac[module_id]->common_channels[0].sib1 ? RC.nrmac[module_id]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL);
 
   const int coresetid = (sched_ctrl->active_bwp||bwpd) ? sched_ctrl->coreset->controlResourceSetId : RC.nrmac[module_id]->sched_ctrlCommon->coreset->controlResourceSetId;
   const uint16_t bwpSize = coresetid == 0 ? RC.nrmac[module_id]->cset0_bwp_size : NRRIV2BW(genericParameters->locationAndBandwidth, MAX_BWP_SIZE);
@@ -611,14 +609,32 @@ bool allocate_dl_retransmission(module_id_t module_id,
     }
     /* check whether we need to switch the TDA allocation since the last
      * (re-)transmission */
-    if (ps->time_domain_allocation != tda)
-      nr_set_pdsch_semi_static(module_id, scc, cg, sched_ctrl->active_bwp, bwpd, tda, ps->nrOfLayers, sched_ctrl, ps);
+    if (ps->time_domain_allocation != tda || sched_ctrl->update_pdsch_ps) {
+      nr_set_pdsch_semi_static(nr_mac->common_channels[0].sib1 ? (const NR_SIB1_t *)nr_mac->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL,
+                               scc,
+                               cg,
+                               sched_ctrl->active_bwp,
+                               bwpd,
+                               tda,
+                               ps->nrOfLayers,
+                               sched_ctrl,
+                               ps);
+      sched_ctrl->update_pdsch_ps = false;
+    }
   } else {
     /* the retransmission will use a different time domain allocation, check
      * that we have enough resources */
 
     NR_pdsch_semi_static_t temp_ps = *ps;
-    nr_set_pdsch_semi_static(module_id, scc, UE_info->CellGroup[UE_id], sched_ctrl->active_bwp, bwpd, tda, ps->nrOfLayers, sched_ctrl, &temp_ps);
+    nr_set_pdsch_semi_static(nr_mac->common_channels[0].sib1 ? (const NR_SIB1_t *)nr_mac->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL,
+                             scc,
+                             UE_info->CellGroup[UE_id],
+                             sched_ctrl->active_bwp,
+                             bwpd,
+                             tda,
+                             ps->nrOfLayers,
+                             sched_ctrl,
+                             &temp_ps);
     while (rbStart < bwpSize &&
            !(rballoc_mask[rbStart]&SL_to_bitmap(temp_ps.startSymbolIndex, temp_ps.nrOfSymbols)))
       rbStart++;
@@ -770,7 +786,7 @@ void pf_dl(module_id_t module_id,
 
       /* Calculate coeff */
       set_dl_mcs(sched_pdsch,sched_ctrl,&mac->dl_max_mcs,ps->mcsTableIdx);
-      sched_pdsch->mcs = get_mcs_from_bler(module_id, /* CC_id = */ 0, frame, slot, UE_id);
+      sched_pdsch->mcs = get_mcs_from_bler(module_id, /* CC_id = */ 0, frame, slot, UE_id, ps->mcsTableIdx);
       layers[UE_id] = set_dl_nrOfLayers(sched_ctrl);
       const uint8_t Qm = nr_get_Qm_dl(sched_pdsch->mcs, ps->mcsTableIdx);
       const uint16_t R = nr_get_code_rate_dl(sched_pdsch->mcs, ps->mcsTableIdx);
@@ -828,15 +844,9 @@ void pf_dl(module_id_t module_id,
     NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
     const uint16_t rnti = UE_info->rnti[UE_id];
 
-    NR_BWP_t *genericParameters = NULL;
-    if(sched_ctrl->active_bwp) {
-      genericParameters = &sched_ctrl->active_bwp->bwp_Common->genericParameters;
-    } else if(RC.nrmac[module_id]->common_channels[0].ServingCellConfigCommon) {
-      genericParameters = &scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters;
-    } else {
-      NR_SIB1_t *sib1 = RC.nrmac[module_id]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1;
-      genericParameters = &sib1->servingCellConfigCommon->downlinkConfigCommon.initialDownlinkBWP.genericParameters;
-    }
+    NR_BWP_t *genericParameters = get_dl_bwp_genericParameters(sched_ctrl->active_bwp,
+                                                               RC.nrmac[module_id]->common_channels[0].ServingCellConfigCommon,
+                                                               RC.nrmac[module_id]->common_channels[0].sib1 ? RC.nrmac[module_id]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL);
 
     const int coresetid = (sched_ctrl->active_bwp||bwpd) ? sched_ctrl->coreset->controlResourceSetId : RC.nrmac[module_id]->sched_ctrlCommon->coreset->controlResourceSetId;
     const uint16_t bwpSize = coresetid == 0 ? RC.nrmac[module_id]->cset0_bwp_size : NRRIV2BW(genericParameters->locationAndBandwidth, MAX_BWP_SIZE);
@@ -909,8 +919,18 @@ void pf_dl(module_id_t module_id,
     NR_sched_pdsch_t *sched_pdsch = &sched_ctrl->sched_pdsch;
     NR_pdsch_semi_static_t *ps = &sched_ctrl->pdsch_semi_static;
 
-    if (ps->nrOfLayers != layers[UE_id] || ps->time_domain_allocation != tda)
-      nr_set_pdsch_semi_static(module_id, scc, UE_info->CellGroup[UE_id], sched_ctrl->active_bwp, bwpd, tda, layers[UE_id], sched_ctrl, ps);
+    if (ps->nrOfLayers != layers[UE_id] || ps->time_domain_allocation != tda || sched_ctrl->update_pdsch_ps) {
+      nr_set_pdsch_semi_static(mac->common_channels[0].sib1 ? (const NR_SIB1_t *)mac->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL,
+                               scc,
+                               UE_info->CellGroup[UE_id],
+                               sched_ctrl->active_bwp,
+                               bwpd,
+                               tda,
+                               layers[UE_id],
+                               sched_ctrl,
+                               ps);
+      sched_ctrl->update_pdsch_ps = false;
+    }
 
     const uint16_t slbitmap = SL_to_bitmap(ps->startSymbolIndex, ps->nrOfSymbols);
     // Freq-demain allocation
@@ -975,15 +995,9 @@ void nr_fr1_dlsch_preprocessor(module_id_t module_id, frame_t frame, sub_frame_t
   const int startSymbolAndLength = tdaList->list.array[tda]->startSymbolAndLength;
   SLIV2SL(startSymbolAndLength, &startSymbolIndex, &nrOfSymbols);
 
-  NR_BWP_t *genericParameters = NULL;
-  if(sched_ctrl->active_bwp) {
-    genericParameters = &sched_ctrl->active_bwp->bwp_Common->genericParameters;
-  } else if(RC.nrmac[module_id]->common_channels[0].ServingCellConfigCommon) {
-    genericParameters = &scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters;
-  } else {
-    NR_SIB1_t *sib1 = RC.nrmac[module_id]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1;
-    genericParameters = &sib1->servingCellConfigCommon->downlinkConfigCommon.initialDownlinkBWP.genericParameters;
-  }
+  NR_BWP_t *genericParameters = get_dl_bwp_genericParameters(sched_ctrl->active_bwp,
+                                                             RC.nrmac[module_id]->common_channels[0].ServingCellConfigCommon,
+                                                             RC.nrmac[module_id]->common_channels[0].sib1 ? RC.nrmac[module_id]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL);
 
   NR_BWP_DownlinkDedicated_t *bwpd =
       UE_info->CellGroup[UE_id] &&
@@ -1158,25 +1172,16 @@ void nr_schedule_ue_spec(module_id_t module_id,
           sched_ctrl->tpc1);
 
     NR_BWP_Downlink_t *bwp = sched_ctrl->active_bwp;
-
-    /* look up the PDCCH PDU for this CC, BWP, and CORESET. If it does not
-     * exist, create it */
-
-    // BWP
-    NR_BWP_t *genericParameters = NULL;
-    if(bwp) {
-      genericParameters = &sched_ctrl->active_bwp->bwp_Common->genericParameters;
-    } else if(RC.nrmac[module_id]->common_channels[0].ServingCellConfigCommon) {
-      genericParameters = &scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters;
-    } else {
-      NR_SIB1_t *sib1 = RC.nrmac[module_id]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1;
-      genericParameters = &sib1->servingCellConfigCommon->downlinkConfigCommon.initialDownlinkBWP.genericParameters;
-    }
+    NR_BWP_t *genericParameters = get_dl_bwp_genericParameters(bwp,
+                                                               RC.nrmac[module_id]->common_channels[0].ServingCellConfigCommon,
+                                                               RC.nrmac[module_id]->common_channels[0].sib1 ? RC.nrmac[module_id]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL);
 
     NR_SearchSpace_t *ss = (bwp||bwpd) ? sched_ctrl->search_space : gNB_mac->sched_ctrlCommon->search_space;
 
     const int bwpid = bwp ? bwp->bwp_Id : 0;
     const int coresetid = (bwp||bwpd) ? sched_ctrl->coreset->controlResourceSetId : gNB_mac->sched_ctrlCommon->coreset->controlResourceSetId;
+
+    /* look up the PDCCH PDU for this CC, BWP, and CORESET. If it does not exist, create it */
     nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu = gNB_mac->pdcch_pdu_idx[CC_id][coresetid];
     if (!pdcch_pdu) {
       LOG_D(NR_MAC, "creating pdcch pdu, pdcch_pdu = NULL. \n");
