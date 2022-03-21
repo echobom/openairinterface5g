@@ -81,8 +81,11 @@ void nr_fill_nfapi_pucch(module_id_t mod_id,
                                     cg->spCellConfig->spCellConfigDedicated->uplinkConfig ?
                                     cg->spCellConfig->spCellConfigDedicated->uplinkConfig->initialUplinkBWP : NULL;
 
-  LOG_D(NR_MAC,"pucch_acknak: %d.%d Calling nr_configure_pucch (ubwpd %p,r_pucch %d) pucch in %d.%d\n",frame,slot,ubwpd,pucch->r_pucch,pucch->frame,pucch->ul_slot);
-  nr_configure_pucch(nr_mac->common_channels[0].sib1 ? nr_mac->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL,
+  LOG_D(NR_MAC,"%d.%d Calling nr_configure_pucch (ubwpd %p,r_pucch %d) pucch to be scheduled in %d.%d\n",
+        frame,slot,ubwpd,pucch->r_pucch,pucch->frame,pucch->ul_slot);
+
+  const NR_SIB1_t *sib1 = nr_mac->common_channels[0].sib1 ? nr_mac->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL;
+  nr_configure_pucch(sib1,
                      pucch_pdu,
                      scc,
                      UE_info->CellGroup[UE_id],
@@ -743,9 +746,10 @@ void nr_csi_meas_reporting(int Mod_idP,
       curr_pucch->csi_bits +=
           nr_get_csi_bitlen(Mod_idP,UE_id,csi_report_id);
 
+      const NR_SIB1_t *sib1 = RC.nrmac[Mod_idP]->common_channels[0].sib1 ? RC.nrmac[Mod_idP]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL;
       NR_BWP_t *genericParameters = get_ul_bwp_genericParameters(sched_ctrl->active_ubwp,
                                                                  scc,
-                                                                 RC.nrmac[Mod_idP]->common_channels[0].sib1 ? RC.nrmac[Mod_idP]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL);
+                                                                 sib1);
 
       int bwp_start = NRRIV2PRBOFFSET(genericParameters->locationAndBandwidth,MAX_BWP_SIZE);
 
@@ -1757,9 +1761,10 @@ int nr_acknack_scheduling(int mod_id,
     pucch_Config = RC.nrmac[mod_id]->UE_info.CellGroup[UE_id]->spCellConfig->spCellConfigDedicated->uplinkConfig->initialUplinkBWP->pucch_Config->choice.setup;
   }
 
+  const NR_SIB1_t *sib1 = RC.nrmac[mod_id]->common_channels[0].sib1 ? RC.nrmac[mod_id]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL;
   NR_BWP_t *genericParameters = get_ul_bwp_genericParameters(sched_ctrl->active_ubwp,
                                                              (NR_ServingCellConfigCommon_t *)scc,
-                                                             RC.nrmac[mod_id]->common_channels[0].sib1 ? RC.nrmac[mod_id]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL);
+                                                             sib1);
 
   int bwp_start = NRRIV2PRBOFFSET(genericParameters->locationAndBandwidth,MAX_BWP_SIZE);
 
@@ -1887,12 +1892,13 @@ void nr_sr_reporting(int Mod_idP, frame_t SFN, sub_frame_t slot)
         }
         curr_pucch->sr_flag = true;
       } else {
-        NR_sched_pucch_t sched_sr;
-        memset(&sched_sr, 0, sizeof(sched_sr));
-        sched_sr.frame = SFN;
-        sched_sr.ul_slot = slot;
-        sched_sr.resource_indicator = found;
-        sched_sr.sr_flag = true;
+        NR_sched_pucch_t sched_sr = {
+          .frame = SFN,
+          .ul_slot = slot,
+          .sr_flag = true,
+          .resource_indicator = found,
+          .r_pucch = -1
+        };
         nr_fill_nfapi_pucch(Mod_idP, SFN, slot, &sched_sr, UE_id);
       }
     }
