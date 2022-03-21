@@ -148,7 +148,8 @@ void get_common_options(uint32_t execmask) {
   if(parallel_config != NULL) set_parallel_conf(parallel_config);
 
   if(worker_config != NULL)   set_worker_conf(worker_config);
-  nfapi_setmode(nfapi_mode);
+
+  nfapi_setmode_str(get_softmodem_params()->strnfapi);
 }
 void softmodem_printresources(int sig, telnet_printfunc_t pf) {
   struct rusage usage;
