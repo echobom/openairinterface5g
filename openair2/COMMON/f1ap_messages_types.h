@@ -23,6 +23,7 @@
 #define F1AP_MESSAGES_TYPES_H_
 
 #include "rlc.h"
+#include "s1ap_messages_types.h"
 
 //-------------------------------------------------------------------------------------------//
 // Defines to access message fields.
@@ -369,7 +370,6 @@ typedef struct f1ap_ue_context_setup_s {
   uint8_t  srbs_to_be_setup_length;
   uint8_t  srbs_failed_to_be_setup_length;
   f1ap_rb_failed_to_be_setup_t *srbs_failed_to_be_setup;
-  s1ap_initial_context_setup_req_t *s1ap_initial_context_setup_req;
    // coniatner for the rrc_eNB_generate_SecurityModeCommand message
   uint8_t *rrc_container;
   int      rrc_container_length;
