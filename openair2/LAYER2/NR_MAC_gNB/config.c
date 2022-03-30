@@ -56,7 +56,8 @@ extern uint8_t nfapi_mode;
 
 void process_rlcBearerConfig(struct NR_CellGroupConfig__rlc_BearerToAddModList *rlc_bearer2add_list,
                              struct NR_CellGroupConfig__rlc_BearerToReleaseList *rlc_bearer2release_list,
-                             NR_UE_sched_ctrl_t *sched_ctrl) {
+                             NR_UE_sched_ctrl_t *sched_ctrl,
+                             pdu_session_param_t *pduSession) {
 
   if (rlc_bearer2release_list) {
     for (int i = 0; i < rlc_bearer2release_list->list.count; i++) {
@@ -138,7 +139,7 @@ void process_phr_Config(NR_UE_sched_ctrl_t *sched_ctrl,NR_SetupRelease_PHR_Confi
    }
 }
 
-void process_CellGroup(NR_CellGroupConfig_t *CellGroup, NR_UE_sched_ctrl_t *sched_ctrl) {
+void process_CellGroup(NR_CellGroupConfig_t *CellGroup, NR_UE_sched_ctrl_t *sched_ctrl, pdu_session_param_t *pduSession) {
 
    AssertFatal(CellGroup, "CellGroup is null\n");
    NR_MAC_CellGroupConfig_t   *mac_CellGroupConfig = CellGroup->mac_CellGroupConfig;
@@ -156,7 +157,7 @@ void process_CellGroup(NR_CellGroupConfig_t *CellGroup, NR_UE_sched_ctrl_t *sche
 
    }
 
-   process_rlcBearerConfig(CellGroup->rlc_BearerToAddModList,CellGroup->rlc_BearerToReleaseList,sched_ctrl);
+   process_rlcBearerConfig(CellGroup->rlc_BearerToAddModList,CellGroup->rlc_BearerToReleaseList,sched_ctrl, pduSession);
 
 }
 
@@ -461,7 +462,8 @@ int rrc_mac_config_req_gNB(module_id_t Mod_idP,
                            NR_BCCH_DL_SCH_Message_t *sib1,
                            int add_ue,
                            uint32_t rnti,
-                           NR_CellGroupConfig_t *CellGroup) {
+                           NR_CellGroupConfig_t *CellGroup,
+                           pdu_session_param_t *pduSession) {
 
   if (scc != NULL ) {
     AssertFatal((scc->ssb_PositionsInBurst->present > 0) && (scc->ssb_PositionsInBurst->present < 4), "SSB Bitmap type %d is not valid\n",scc->ssb_PositionsInBurst->present);
@@ -604,7 +606,7 @@ int rrc_mac_config_req_gNB(module_id_t Mod_idP,
     if (add_ue == 1 && get_softmodem_params()->phy_test) {
       const int UE_id = add_new_nr_ue(Mod_idP, rnti, CellGroup);
       LOG_I(NR_MAC,"Added new UE_id %d/%x with initial CellGroup\n",UE_id,rnti);
-      process_CellGroup(CellGroup,&UE_info->UE_sched_ctrl[UE_id]);
+      process_CellGroup(CellGroup,&UE_info->UE_sched_ctrl[UE_id], pduSession);
     } else if (add_ue == 1 && !get_softmodem_params()->phy_test) {
       const int CC_id = 0;
       NR_COMMON_channels_t *cc = &RC.nrmac[Mod_idP]->common_channels[CC_id];
@@ -655,7 +657,8 @@ int rrc_mac_config_req_gNB(module_id_t Mod_idP,
       int target_ss;
       UE_info->CellGroup[UE_id] = CellGroup;
       LOG_I(NR_MAC,"Modified UE_id %d/%x with CellGroup\n",UE_id,rnti);
-      process_CellGroup(CellGroup,&UE_info->UE_sched_ctrl[UE_id]);
+      process_CellGroup(CellGroup,&UE_info->UE_sched_ctrl[UE_id], pduSession);
+      const NR_ServingCellConfig_t *servingCellConfig = CellGroup ? CellGroup->spCellConfig->spCellConfigDedicated : NULL;
       NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
       sched_ctrl->update_pdsch_ps = true;
       sched_ctrl->update_pusch_ps = true;
