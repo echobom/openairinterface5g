@@ -52,6 +52,10 @@
 #define OAI_UL_LDPC_MAX_NUM_LLR 27000//26112 // NR_LDPC_NCOL_BG1*NR_LDPC_ZMAX = 68*384
 //#define PRINT_CRC_CHECK
 
+#if LATSEQ
+  #include "common/utils/LATSEQ/latseq.h"
+#endif
+
 //extern double cpuf;
 
 void free_gNB_ulsch(NR_gNB_ULSCH_t **ulschptr,uint8_t N_RB_UL)
@@ -616,6 +620,10 @@ uint32_t nr_ulsch_decoding(PHY_VARS_gNB *phy_vars_gNB,
     rdata->ulsch_id = ULSCH_id;
     pushTpool(phy_vars_gNB->threadPool,req);
     phy_vars_gNB->nbDecode++;
+#if LATSEQ
+    int sz=Kr_bytes - (harq_process->F>>3) - ((harq_process->C>1)?3:0)
+    LATSEQ_P("U phy.in.proc--mac.harq.up", "len%d::ulsch_id%d.cbseg%d.fm%dulsch_harq%d", sz, rdata->ulsch_id, r, frame, rdata->ulsch_harq);
+#endif
     LOG_D(PHY,"Added a block to decode, in pipe: %d\n",phy_vars_gNB->nbDecode);
     r_offset += E;
     offset += (Kr_bytes - (harq_process->F>>3) - ((harq_process->C>1)?3:0));
