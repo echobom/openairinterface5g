@@ -2067,6 +2067,7 @@ void configure_gnb_du_mac(int inst) {
                         0,
                         0, // rnti
                         (NR_CellGroupConfig_t *)NULL,
+                        NULL,
                         NULL);
 }
 

@@ -554,6 +554,10 @@ typedef struct NR_UE_ul_harq {
   NR_sched_pusch_t sched_pusch;
 } NR_UE_ul_harq_t;
 
+typedef struct NR_QoS_config {
+  uint64_t fiveQI;
+} NR_QoS_config_t;
+
 /*! \brief scheduling control information set through an API */
 #define MAX_CSI_REPORTS 48
 typedef struct {
@@ -651,6 +655,8 @@ typedef struct {
   uint8_t dl_lc_num;
   /// order in which DLSCH scheduler should allocate LCs
   uint8_t dl_lc_ids[NR_MAX_NUM_LCID];
+
+  NR_QoS_config_t nr_QoS_config[NR_MAX_NUM_LCID][NR_MAX_NUM_QFI];
 
 } NR_UE_sched_ctrl_t;
 
