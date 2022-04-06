@@ -449,6 +449,10 @@ void config_common(int Mod_idP, int ssb_SubcarrierOffset, rrc_pdsch_AntennaPorts
 
 }
 
+void nr_rrc_mac_schedule_ue_enabled(module_id_t module_id, rnti_t rnti, bool schedule_enabled) {
+  const int UE_id = find_nr_UE_id(module_id,rnti);
+  RC.nrmac[module_id]->UE_info.UE_sched_ctrl[UE_id].schedule_enabled = schedule_enabled;
+}
 
 int rrc_mac_config_req_gNB(module_id_t Mod_idP,
                            int ssb_SubcarrierOffset,
@@ -694,6 +698,6 @@ int rrc_mac_config_req_gNB(module_id_t Mod_idP,
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_RRC_MAC_CONFIG, VCD_FUNCTION_OUT);
   
     
-  return(0);
+  return 0;
 
 }// END rrc_mac_config_req_gNB

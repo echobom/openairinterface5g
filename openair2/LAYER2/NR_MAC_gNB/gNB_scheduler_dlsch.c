@@ -489,6 +489,11 @@ void nr_store_dlsch_buffer(module_id_t module_id,
       const int lcid = sched_ctrl->dl_lc_ids[i];
       const uint16_t rnti = UE_info->rnti[UE_id];
       LOG_D(NR_MAC, "In %s: UE %d/%x: LCID %d\n", __FUNCTION__, UE_id, rnti, lcid);
+
+      if(lcid == DL_SCH_LCID_DTCH && sched_ctrl->schedule_enabled == false) {
+        continue;
+      }
+
       start_meas(&RC.nrmac[module_id]->rlc_status_ind);
       sched_ctrl->rlc_status[lcid] = mac_rlc_status_ind(module_id,
                                                         rnti,
