@@ -37,6 +37,9 @@
 #include "T.h"
 #include "executables/nr-softmodem.h"
 #include "executables/softmodem-common.h"
+#if LATSEQ
+  #include "common/utils/LATSEQ/latseq.h"
+#endif
 
 #include "assertions.h"
 
@@ -193,6 +196,10 @@ void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
   }
 
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_gNB_TX+offset,0);
+
+#if LATSEQ
+   LATSEQ_P("D mac.harq.down--phy.out.proc","len%d::fm%d.slot%d", txdataF_offset, frame, slot);
+#endif
 
   if (do_meas==1) stop_meas(&msgTx->phy_proc_tx);
 }
