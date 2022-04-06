@@ -250,6 +250,9 @@ void nr_postDecode(PHY_VARS_gNB *gNB, notifiedFIFO_elt_t *req) {
       nr_fill_indication(gNB,ulsch_harq->frame, ulsch_harq->slot, rdata->ulsch_id, rdata->harq_pid, 0,0);
       //dumpsig=1;
     } else {
+#if LATSEQ
+      LATSEQ_P("I mac.harq.up", "nack%d::harq%d.fm%d.slot%d", ulsch_harq->round, rdata->harq_pid, rdata->frame, ulsch_harq->slot);
+#endif
       LOG_D(PHY,"[gNB %d] ULSCH: Setting NAK for SFN/SF %d/%d (pid %d, ndi %d, status %d, round %d, RV %d, prb_start %d, prb_size %d, TBS %d) r %d\n",
             gNB->Mod_id, ulsch_harq->frame, ulsch_harq->slot,
             rdata->harq_pid, pusch_pdu->pusch_data.new_data_indicator, ulsch_harq->status,
