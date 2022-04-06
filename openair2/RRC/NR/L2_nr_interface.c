@@ -207,13 +207,13 @@ nr_rrc_data_req(
   return TRUE; // TODO should be changed to a CNF message later, currently RRC lite does not used the returned value anyway.
 }
 
-int8_t mac_rrc_nr_data_req(const module_id_t Mod_idP,
-                           const int         CC_id,
-                           const frame_t     frameP,
-                           const rb_id_t     Srb_id,
-                           const rnti_t      rnti,
-                           const uint8_t     Nb_tb,
-                           uint8_t *const    buffer_pP ){
+uint16_t mac_rrc_nr_data_req(const module_id_t Mod_idP,
+                             const int         CC_id,
+                             const frame_t     frameP,
+                             const rb_id_t     Srb_id,
+                             const rnti_t      rnti,
+                             const uint8_t     Nb_tb,
+                             uint8_t *const    buffer_pP ){
 
 #ifdef DEBUG_RRC
   LOG_D(RRC,"[eNB %d] mac_rrc_data_req to SRB ID=%ld\n",Mod_idP,Srb_id);
@@ -269,13 +269,13 @@ int8_t mac_rrc_nr_data_req(const module_id_t Mod_idP,
   if( (Srb_id & RAB_OFFSET ) == CCCH) {
 
     char *payload_pP;
-    uint8_t Sdu_size = 0;
+    uint16_t Sdu_size = 0;
     struct rrc_gNB_ue_context_s *ue_context_p = rrc_gNB_get_ue_context(RC.nrrrc[Mod_idP], rnti);
 
     LOG_D(NR_RRC,"[gNB %d] Frame %d CCCH request (Srb_id %ld)\n", Mod_idP, frameP, Srb_id);
 
     AssertFatal(ue_context_p!=NULL,"failed to get ue_context, rnti %x\n",rnti);
-    char payload_size = ue_context_p->ue_context.Srb0.Tx_buffer.payload_size;
+    uint16_t payload_size = ue_context_p->ue_context.Srb0.Tx_buffer.payload_size;
 
     // check if data is there for MAC
     if (payload_size > 0) {
@@ -291,6 +291,21 @@ int8_t mac_rrc_nr_data_req(const module_id_t Mod_idP,
 
   return(0);
 
+}
+
+int8_t nr_mac_rrc_bwp_switch_req(const module_id_t     module_idP,
+                                 const frame_t         frameP,
+                                 const sub_frame_t     sub_frameP,
+                                 const rnti_t          rntiP,
+                                 const int             bwp_id) {
+
+  struct rrc_gNB_ue_context_s *ue_context_p = rrc_gNB_get_ue_context(RC.nrrrc[module_idP], rntiP);
+
+  protocol_ctxt_t ctxt;
+  PROTOCOL_CTXT_SET_BY_MODULE_ID(&ctxt, module_idP, GNB_FLAG_YES, rntiP, frameP, sub_frameP, 0);
+  nr_rrc_reconfiguration_req(ue_context_p, &ctxt, bwp_id);
+
+  return 0;
 }
 
 int8_t nr_mac_rrc_data_ind(const module_id_t     module_idP,
@@ -312,6 +327,7 @@ int8_t nr_mac_rrc_data_ind(const module_id_t     module_idP,
     // call do_RRCSetup like full procedure and extract masterCellGroup
     NR_CellGroupConfig_t cellGroupConfig;
     NR_ServingCellConfigCommon_t *scc=RC.nrrrc[module_idP]->carrier.servingcellconfigcommon;
+    NR_ServingCellConfig_t *servingcellconfigdedicated = RC.nrrrc[module_idP]->configuration.scd;
     memset(&cellGroupConfig,0,sizeof(cellGroupConfig));
 
     struct rrc_gNB_ue_context_s *ue_context_p = rrc_gNB_allocate_new_UE_context(RC.nrrrc[module_idP]);
@@ -321,16 +337,16 @@ int8_t nr_mac_rrc_data_ind(const module_id_t     module_idP,
     ue_context_p->ue_context.Srb0.Active        = 1;
     RB_INSERT(rrc_nr_ue_tree_s, &RC.nrrrc[module_idP]->rrc_ue_head, ue_context_p);
 
-    fill_initial_cellGroupConfig(ue_context_p->local_uid,&cellGroupConfig,scc, &RC.nrrrc[module_idP]->configuration);
+    fill_initial_cellGroupConfig(ue_context_p->local_uid,&cellGroupConfig,scc,servingcellconfigdedicated,&RC.nrrrc[module_idP]->configuration);
 
     MessageDef* tmp=itti_alloc_new_message_sized(TASK_RRC_GNB, 0, F1AP_INITIAL_UL_RRC_MESSAGE, sizeof(f1ap_initial_ul_rrc_message_t) + sdu_lenP);
     f1ap_initial_ul_rrc_message_t *msg = &F1AP_INITIAL_UL_RRC_MESSAGE(tmp);
 
     asn_enc_rval_t enc_rval = uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig,
-						    NULL,
-						    (void *)&cellGroupConfig,
-						    msg->du2cu_rrc_container,
-						    1024); //sizeof(msg->du2cu_rrc_container));
+                                                    NULL,
+                                                    (void *)&cellGroupConfig,
+                                                    msg->du2cu_rrc_container,
+                                                    F1AP_MAX_DU2CU_RRC_LENGTH);
 
     if (enc_rval.encoded == -1) {
       LOG_E(F1AP,"Could not encoded cellGroupConfig, failed element %s\n",enc_rval.failed_type->name);
@@ -398,7 +414,13 @@ void nr_mac_gNB_enable_rrc_processing_timer_req(const module_id_t Mod_instP, con
   ue_context_p = rrc_gNB_get_ue_context(RC.nrrrc[Mod_instP], rntiP);
   if (ue_context_p != NULL) {
     ue_context_p->ue_context.nr_rrc_processing_timer = 1;
-    ue_context_p->ue_context.nr_rrc_processing_delay = NR_RRC_PROCESSING_DELAY_MS;
+    uint32_t delay_ms = NR_RRC_PROCESSING_DELAY_MS;
+    if (ue_context_p->ue_context.masterCellGroup &&
+        ue_context_p->ue_context.masterCellGroup->spCellConfig->spCellConfigDedicated &&
+        ue_context_p->ue_context.masterCellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList) {
+      delay_ms += NR_RRC_BWP_SWITCH_DELAY_MS;
+    }
+    ue_context_p->ue_context.nr_rrc_processing_delay = delay_ms;
   } else {
     LOG_E(NR_RRC,"%s: Unknown RNTI 0x%04x\n", __FUNCTION__, rntiP);
   }

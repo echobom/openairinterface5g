@@ -101,6 +101,7 @@ typedef struct nr_uid_linear_allocator_s {
 
 // 3GPP TS 38.331 Section 12 Table 12.1-1: UE performance requirements for RRC procedures for UEs
 #define NR_RRC_PROCESSING_DELAY_MS  10
+#define NR_RRC_BWP_SWITCH_DELAY_MS  6
 
 #define NR_UE_MODULE_INVALID ((module_id_t) ~0) // FIXME attention! depends on type uint8_t!!!
 #define NR_UE_INDEX_INVALID  ((module_id_t) ~0) // FIXME attention! depends on type uint8_t!!! used to be -1
@@ -133,7 +134,7 @@ typedef enum UE_STATE_NR_e {
 #define MAX_MEAS_ID                                   7
 
 #define PAYLOAD_SIZE_MAX                              1024
-#define RRC_BUF_SIZE                                  512
+#define RRC_BUF_SIZE                                  1024
 #define UNDEF_SECURITY_MODE                           0xff
 #define NO_SECURITY_MODE                              0x20
 
@@ -218,7 +219,7 @@ typedef struct HANDOVER_INFO_NR_s {
 typedef struct {
   char                                                Payload[NR_RRC_BUFFER_SIZE_MAX];
   char                                                Header[NR_RRC_HEADER_SIZE_MAX];
-  char                                                payload_size;
+  uint16_t                                            payload_size;
 } NR_RRC_BUFFER;
 
 #define NR_RRC_BUFFER_SIZE                            sizeof(RRC_BUFFER_NR)
@@ -457,6 +458,7 @@ typedef struct {
   NR_BCCH_DL_SCH_Message_t                  systemInformation; // SIB23
   NR_BCCH_DL_SCH_Message_t                  *siblock1;
   NR_ServingCellConfigCommon_t              *servingcellconfigcommon;
+  NR_ServingCellConfig_t                    *servingcellconfig;
   NR_PDCCH_ConfigSIB1_t                     *pdcch_ConfigSIB1;
   NR_CellGroupConfig_t                      *secondaryCellGroup[MAX_NR_RRC_UE_CONTEXTS];
   NR_SRB_INFO                               SI;

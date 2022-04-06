@@ -371,14 +371,27 @@ void fix_scc(NR_ServingCellConfigCommon_t *scc,uint64_t ssbmap) {
 /* Function to allocate dedicated serving cell config strutures */
 void prepare_scd(NR_ServingCellConfig_t *scd) {
   // Allocate downlink structures
-
   scd->downlinkBWP_ToAddModList = CALLOC(1, sizeof(*scd->downlinkBWP_ToAddModList));
+  scd->uplinkConfig = CALLOC(1, sizeof(*scd->uplinkConfig));
+  scd->uplinkConfig->uplinkBWP_ToAddModList = CALLOC(1, sizeof(*scd->uplinkConfig->uplinkBWP_ToAddModList));
+  scd->bwp_InactivityTimer = CALLOC(1, sizeof(*scd->bwp_InactivityTimer));
+  scd->uplinkConfig->firstActiveUplinkBWP_Id  = CALLOC(1, sizeof(*scd->uplinkConfig->firstActiveUplinkBWP_Id));
+  scd->firstActiveDownlinkBWP_Id = CALLOC(1, sizeof(*scd->firstActiveDownlinkBWP_Id));
+  *scd->firstActiveDownlinkBWP_Id = 1;
+  *scd->uplinkConfig->firstActiveUplinkBWP_Id = 1;
+  scd->defaultDownlinkBWP_Id = CALLOC(1, sizeof(*scd->defaultDownlinkBWP_Id));
+  *scd->defaultDownlinkBWP_Id = 0;
 
+for (int j = 0; j < NR_MAX_NUM_BWP; j++) {
+  
   // Downlink bandwidth part
   NR_BWP_Downlink_t *bwp = calloc(1, sizeof(*bwp));
-  bwp->bwp_Id = 1;
+  bwp->bwp_Id = j+1;
 
   // Allocate downlink dedicated bandwidth part and PDSCH structures
+  bwp->bwp_Common = calloc(1, sizeof(*bwp->bwp_Common));
+  bwp->bwp_Common->pdcch_ConfigCommon = calloc(1, sizeof(*bwp->bwp_Common->pdcch_ConfigCommon));
+  bwp->bwp_Common->pdsch_ConfigCommon = calloc(1, sizeof(*bwp->bwp_Common->pdsch_ConfigCommon));
   bwp->bwp_Dedicated = calloc(1, sizeof(*bwp->bwp_Dedicated));
   bwp->bwp_Dedicated->pdsch_Config = calloc(1, sizeof(*bwp->bwp_Dedicated->pdsch_Config));
   bwp->bwp_Dedicated->pdsch_Config->present = NR_SetupRelease_PDSCH_Config_PR_setup;
@@ -410,9 +423,6 @@ void prepare_scd(NR_ServingCellConfig_t *scd) {
 
   // Allocate uplink structures
 
-  scd->uplinkConfig = CALLOC(1, sizeof(*scd->uplinkConfig));
-  scd->uplinkConfig->uplinkBWP_ToAddModList = CALLOC(1, sizeof(*scd->uplinkConfig->uplinkBWP_ToAddModList));
-
   NR_PUSCH_Config_t *pusch_Config = CALLOC(1, sizeof(*pusch_Config));
 
   // Allocate UL DMRS and PTRS structures
@@ -440,7 +450,8 @@ void prepare_scd(NR_ServingCellConfig_t *scd) {
 
   // UL bandwidth part
   NR_BWP_Uplink_t *ubwp = CALLOC(1, sizeof(*ubwp));
-  ubwp->bwp_Id = 1;
+  ubwp->bwp_Id = j+1;
+  ubwp->bwp_Common = CALLOC(1, sizeof(*ubwp->bwp_Common));
   ubwp->bwp_Dedicated = CALLOC(1, sizeof(*ubwp->bwp_Dedicated));
 
   ubwp->bwp_Dedicated->pusch_Config = CALLOC(1, sizeof(*ubwp->bwp_Dedicated->pusch_Config));
@@ -449,79 +460,112 @@ void prepare_scd(NR_ServingCellConfig_t *scd) {
 
   ASN_SEQUENCE_ADD(&scd->uplinkConfig->uplinkBWP_ToAddModList->list,ubwp);
 }
+}
 
-/* This function checks dedicated serving cell configuration and performs fixes as needed */ 
+/* This function checks dedicated serving cell configuration and performs fixes as needed */
 void fix_scd(NR_ServingCellConfig_t *scd) {
+
+  // Remove unused BWPs
+  int b = 0;
+  while (b<scd->downlinkBWP_ToAddModList->list.count) {
+    if (scd->downlinkBWP_ToAddModList->list.array[b]->bwp_Common->genericParameters.locationAndBandwidth == 0) {
+      asn_sequence_del(&scd->downlinkBWP_ToAddModList->list,b,1);
+    } else {
+      b++;
+    }
+  }
+
+  b = 0;
+  while (b<scd->uplinkConfig->uplinkBWP_ToAddModList->list.count) {
+    if (scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[b]->bwp_Common->genericParameters.locationAndBandwidth == 0) {
+      asn_sequence_del(&scd->uplinkConfig->uplinkBWP_ToAddModList->list,b,1);
+    } else {
+      b++;
+    }
+  }
+
   // Check for DL PTRS parameters validity
-  if (scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS) {
-    // If any of the frequencyDensity values are not set or are out of bounds, PTRS is assumed to be not present
-    for (int i = scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->frequencyDensity->list.count-1; i >= 0; i--) {
-      if ((*scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->frequencyDensity->list.array[i] < 1)
-          || (*scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->frequencyDensity->list.array[i] > 276)) {
-        LOG_I(RRC, "DL PTRS frequencyDensity %d not set. Assuming PTRS not present! \n", i);
-        free(scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS);
-        scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS = NULL;
-        break;
-      }
-    }
-  }
-  if (scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS) {
-    // If any of the timeDensity values are not set or are out of bounds, PTRS is assumed to be not present
-    for (int i = scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->timeDensity->list.count-1; i >= 0; i--) {
-      if ((*scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->timeDensity->list.array[i] < 0)
-          || (*scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->timeDensity->list.array[i] > 29)) {
-        LOG_I(RRC, "DL PTRS timeDensity %d not set. Assuming PTRS not present! \n", i);
-        free(scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS);
-        scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS = NULL;
-        break;
-      }
-    }
-  }
-  if (scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS) {
-    if (*scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->resourceElementOffset > 2) {
-      LOG_I(RRC, "Freeing DL PTRS resourceElementOffset \n");
-      free(scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->resourceElementOffset);
-      scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->resourceElementOffset = NULL;
-    }
-    if (*scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->epre_Ratio > 1) {
-      LOG_I(RRC, "Freeing DL PTRS epre_Ratio \n");
-      free(scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->epre_Ratio);
-      scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->epre_Ratio = NULL;
-    }
-  }
+  for (int bwp_i = 0 ; bwp_i<scd->downlinkBWP_ToAddModList->list.count; bwp_i++) {
 
-  if (scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS) {
-    // If any of the frequencyDensity values are not set or are out of bounds, PTRS is assumed to be not present
-    for (int i = scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->frequencyDensity->list.count-1; i >= 0; i--) {
-      if ((*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->frequencyDensity->list.array[i] < 1) 
-          || (*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->frequencyDensity->list.array[i] > 276)) {
-        LOG_I(RRC, "UL PTRS frequencyDensity %d not set. Assuming PTRS not present! \n", i);
-        free(scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS);
-        scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS = NULL;
-        break;
+    if (scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS) {
+      // If any of the frequencyDensity values are not set or are out of bounds, PTRS is assumed to be not present
+      for (int i = scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->frequencyDensity->list.count - 1; i >= 0; i--) {
+        if ((*scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->frequencyDensity->list.array[i] < 1)
+            || (*scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->frequencyDensity->list.array[i] > 276)) {
+          LOG_I(RRC, "DL PTRS frequencyDensity %d not set. Assuming PTRS not present! \n", i);
+          free(scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS);
+          scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS = NULL;
+          break;
+        }
+      }
+    }
+
+    if (scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS) {
+      // If any of the timeDensity values are not set or are out of bounds, PTRS is assumed to be not present
+      for (int i =
+          scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->timeDensity->list.count - 1; i >= 0; i--) {
+        if ((*scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->timeDensity->list.array[i] < 0)
+            || (*scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->timeDensity->list.array[i] > 29)) {
+          LOG_I(RRC, "DL PTRS timeDensity %d not set. Assuming PTRS not present! \n", i);
+          free(scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS);
+          scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS = NULL;
+          break;
+        }
+      }
+    }
+
+    if (scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS) {
+      if (*scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->resourceElementOffset > 2) {
+        LOG_I(RRC, "Freeing DL PTRS resourceElementOffset \n");
+        free(scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->resourceElementOffset);
+        scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->resourceElementOffset = NULL;
+      }
+      if (*scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->epre_Ratio > 1) {
+        LOG_I(RRC, "Freeing DL PTRS epre_Ratio \n");
+        free(scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->epre_Ratio);
+        scd->downlinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pdsch_Config->choice.setup->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup->epre_Ratio = NULL;
       }
     }
   }
 
-  if (scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS) {
-    // If any of the timeDensity values are not set or are out of bounds, PTRS is assumed to be not present
-    for (int i = scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->timeDensity->list.count-1; i >= 0; i--) {
-      if ((*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->timeDensity->list.array[i] < 0)
-          || (*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->timeDensity->list.array[i] > 29)) {
-        LOG_I(RRC, "UL PTRS timeDensity %d not set. Assuming PTRS not present! \n", i);
-        free(scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS);
-        scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS = NULL;
-        break;
+  // Check for UL PTRS parameters validity
+  for (int bwp_i = 0 ; bwp_i<scd->uplinkConfig->uplinkBWP_ToAddModList->list.count; bwp_i++) {
+
+    if (scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS) {
+      // If any of the frequencyDensity values are not set or are out of bounds, PTRS is assumed to be not present
+      for (int i = scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->frequencyDensity->list.count-1; i >= 0; i--) {
+        if ((*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->frequencyDensity->list.array[i] < 1)
+            || (*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->frequencyDensity->list.array[i] > 276)) {
+          LOG_I(RRC, "UL PTRS frequencyDensity %d not set. Assuming PTRS not present! \n", i);
+          free(scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS);
+          scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS = NULL;
+          break;
+        }
       }
     }
-  }
-  if (scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS) {
-    // Check for UL PTRS parameters validity
-    if (*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->resourceElementOffset > 2) {
-      LOG_I(RRC, "Freeing UL PTRS resourceElementOffset \n");
-      free(scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->resourceElementOffset);
-      scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->resourceElementOffset = NULL;
+
+    if (scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS) {
+      // If any of the timeDensity values are not set or are out of bounds, PTRS is assumed to be not present
+      for (int i = scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->timeDensity->list.count-1; i >= 0; i--) {
+        if ((*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->timeDensity->list.array[i] < 0)
+            || (*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->timeDensity->list.array[i] > 29)) {
+          LOG_I(RRC, "UL PTRS timeDensity %d not set. Assuming PTRS not present! \n", i);
+          free(scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS);
+          scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS = NULL;
+          break;
+        }
+      }
     }
+
+    if (scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS) {
+      // Check for UL PTRS parameters validity
+      if (*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->resourceElementOffset > 2) {
+        LOG_I(RRC, "Freeing UL PTRS resourceElementOffset \n");
+        free(scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->resourceElementOffset);
+        scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_i]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->resourceElementOffset = NULL;
+      }
+    }
+
   }
 }
 
@@ -986,8 +1030,8 @@ void RCconfig_NRRRC(MessageDef *msg_p, uint32_t i, gNB_RRC_INST *rrc) {
   prepare_scd(scd);
   paramdef_t SCDsParams[] = SCDPARAMS_DESC(scd);
   paramlist_def_t SCDsParamList = {GNB_CONFIG_STRING_SERVINGCELLCONFIGDEDICATED, NULL, 0};
+  
    ////////// Physical parameters
-
 
   /* get global parameters, defined outside any section in the config file */
  
@@ -1064,13 +1108,17 @@ void RCconfig_NRRRC(MessageDef *msg_p, uint32_t i, gNB_RRC_INST *rrc) {
     if (SCDsParamList.numelt > 0) {    
       sprintf(aprefix, "%s.[%i].%s.[%i]", GNB_CONFIG_STRING_GNB_LIST,0,GNB_CONFIG_STRING_SERVINGCELLCONFIGDEDICATED, 0);
       config_get( SCDsParams,sizeof(SCDsParams)/sizeof(paramdef_t),aprefix);  
-      LOG_I(RRC,"Read in ServingCellConfigDedicated UL (FreqDensity_0 %d, FreqDensity_1 %d, TimeDensity_0 %d, TimeDensity_1 %d, TimeDensity_2 %d, RE offset %d \n",
+      LOG_I(RRC,"Read in ServingCellConfigDedicated UL (FreqDensity_0 %d, FreqDensity_1 %d, TimeDensity_0 %d, TimeDensity_1 %d, TimeDensity_2 %d, RE offset %d, First_active_BWP_ID %d SCS %d, LocationandBW %d \n",
       (int)*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->frequencyDensity->list.array[0],
       (int)*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->frequencyDensity->list.array[1],
       (int)*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->timeDensity->list.array[0],
       (int)*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->timeDensity->list.array[1],
       (int)*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->timeDensity->list.array[2],
-      (int)*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->resourceElementOffset);
+      (int)*scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->phaseTrackingRS->choice.setup->transformPrecoderDisabled->resourceElementOffset,
+      (int)*scd->firstActiveDownlinkBWP_Id,
+      (int)scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Common->genericParameters.subcarrierSpacing,
+      (int)scd->downlinkBWP_ToAddModList->list.array[0]->bwp_Common->genericParameters.locationAndBandwidth
+      );
     }
     fix_scd(scd);
 

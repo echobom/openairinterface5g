@@ -1441,7 +1441,6 @@ void pf_ul(module_id_t module_id,
     }
     else LOG_D(NR_MAC,"allocating UL data for UE %d/RNTI %04x (rbStsart %d, min_rb %d, bwpSize %d\n",UE_id, UE_info->rnti[UE_id],rbStart,min_rb,bwpSize);
 
-
     /* Calculate the current scheduling bytes and the necessary RBs */
     const int B = cmax(sched_ctrl->estimated_ul_buffer - sched_ctrl->sched_ul_bytes, 0);
     uint16_t rbSize = 0;
