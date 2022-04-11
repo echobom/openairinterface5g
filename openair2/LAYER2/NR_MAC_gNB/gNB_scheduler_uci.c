@@ -873,7 +873,8 @@ int checkTargetSSBInTCIStates_pdcchConfig(int ssb_index_t, int Mod_idP, int UE_i
   int nb_tci_states = CellGroup->spCellConfig->spCellConfigDedicated->initialDownlinkBWP->pdsch_Config->choice.setup->tci_StatesToAddModList->list.count;
   NR_TCI_State_t *tci =NULL;
   NR_TCI_StateId_t *tci_id = NULL;
-  int bwp_id = 1; //TODO
+  NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
+  const int bwp_id  = sched_ctrl->active_bwp ? sched_ctrl->active_bwp->bwp_Id : 0;
   NR_BWP_Downlink_t *bwp = CellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list.array[bwp_id-1];
   NR_ControlResourceSet_t *coreset = bwp->bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList->list.array[bwp_id-1];
   int i;
@@ -943,7 +944,7 @@ void tci_handling(module_id_t Mod_idP, int UE_id, frame_t frame, slot_t slot) {
   uint8_t idx = 0;
   NR_UE_info_t *UE_info = &RC.nrmac[Mod_idP]->UE_info;
   NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
-  int bwp_id  = sched_ctrl->active_bwp ? 1 : 0;
+  const int bwp_id  = sched_ctrl->active_bwp ? sched_ctrl->active_bwp->bwp_Id : 0;
   NR_CellGroupConfig_t *CellGroup = UE_info->CellGroup[UE_id];
   NR_BWP_Downlink_t *bwp = bwp_id>0 ?
                            sched_ctrl->active_bwp:
@@ -1718,11 +1719,10 @@ int nr_acknack_scheduling(int mod_id,
 
   NR_SearchSpace__searchSpaceType_PR ss_type = (is_common==0 && (sched_ctrl->active_bwp || ubwpd)) ? NR_SearchSpace__searchSpaceType_PR_ue_Specific: NR_SearchSpace__searchSpaceType_PR_common;
   uint8_t pdsch_to_harq_feedback[8];
-  int bwp_Id = 0;
-  if (sched_ctrl->active_ubwp) bwp_Id = sched_ctrl->active_ubwp->bwp_Id;
+  const int bwp_id = sched_ctrl->active_bwp ? sched_ctrl->active_bwp->bwp_Id : 0;
 
   int max_fb_time = 0;
-  get_pdsch_to_harq_feedback(mod_id, UE_id, bwp_Id, ss_type, &max_fb_time, pdsch_to_harq_feedback);
+  get_pdsch_to_harq_feedback(mod_id, UE_id, bwp_id, ss_type, &max_fb_time, pdsch_to_harq_feedback);
 
   LOG_D(NR_MAC, "In %s: 1b. DL %d.%d, UL_ACK %d.%d, DAI_C %d\n", __FUNCTION__, frame,slot,pucch->frame,pucch->ul_slot,pucch->dai_c);
   /* there is a HARQ. Check whether we can use it for this ACKNACK */

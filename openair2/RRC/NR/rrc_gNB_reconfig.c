@@ -310,6 +310,7 @@ void fill_default_nsa_downlinkBWP(NR_BWP_Downlink_t *bwp,
   bwp->bwp_Dedicated->pdsch_Config->choice.setup->rbg_Size=NR_PDSCH_Config__rbg_Size_config1;
   set_dl_mcs_table(bwp->bwp_Common->genericParameters.subcarrierSpacing,
                    configuration->force_256qam_off ? NULL : uecap,
+                   secondaryCellGroup->spCellConfig,
                    bwp->bwp_Dedicated,
                    servingcellconfigcommon);
   bwp->bwp_Dedicated->pdsch_Config->choice.setup->maxNrofCodeWordsScheduledByDCI = calloc(1,sizeof(*bwp->bwp_Dedicated->pdsch_Config->choice.setup->maxNrofCodeWordsScheduledByDCI));
@@ -1510,9 +1511,6 @@ void fill_default_secondaryCellGroup(NR_ServingCellConfigCommon_t *servingcellco
     xer_fprint(stdout, &asn_DEF_NR_SpCellConfig, (void *)secondaryCellGroup->spCellConfig);
   }
 }
-
-
-
 
 void fill_default_reconfig(NR_ServingCellConfigCommon_t *servingcellconfigcommon,
                            NR_ServingCellConfig_t *servingcellconfigdedicated,
