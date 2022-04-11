@@ -2092,7 +2092,6 @@ static void NRRCconfig_RU(void) {
         RC.ru[j]->max_rxgain                        = *(RUParamList.paramarray[j][RU_MAX_RXGAIN_IDX].uptr);
         RC.ru[j]->sf_extension                      = *(RUParamList.paramarray[j][RU_SF_EXTENSION_IDX].uptr);
         RC.ru[j]->end_of_burst_delay                = *(RUParamList.paramarray[j][RU_END_OF_BURST_DELAY_IDX].uptr);
-        for (i=0; i<RC.ru[j]->num_bands; i++) RC.ru[j]->band[i] = RUParamList.paramarray[j][RU_BAND_LIST_IDX].iptr[i];
       } //strcmp(local_rf, "yes") == 0
       else {
         printf("RU %d: Transport %s\n",j,*(RUParamList.paramarray[j][RU_TRANSPORT_PREFERENCE_IDX].strptr));

@@ -2992,8 +2992,8 @@ uint16_t nr_dci_size(const NR_BWP_DownlinkCommon_t *initialDownlinkBWP,
       size += dci_pdu->antenna_ports.nbits;
       LOG_D(NR_MAC,"dci_pdu->antenna_ports.nbits %d\n",dci_pdu->antenna_ports.nbits);
       // Tx Config Indication
-      int corset_id = 1 ;
-      long *isTciEnable = pdcch_Config->controlResourceSetToAddModList->list.array[corset_id-1]->tci_PresentInDCI;
+      int coreset_id = 1;
+      long *isTciEnable = pdcch_Config->controlResourceSetToAddModList->list.array[coreset_id-1]->tci_PresentInDCI;
       if (isTciEnable != NULL) {
         dci_pdu->transmission_configuration_indication.nbits = 3;
         size += dci_pdu->transmission_configuration_indication.nbits;

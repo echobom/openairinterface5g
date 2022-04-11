@@ -659,7 +659,7 @@ void nr_initiate_ra_proc(module_id_t module_idP,
                        beam_index,
                        cc->num_active_ssb,
                        nr_mac->tdd_beam_association,
-		       nr_mac->if_inst->sl_ahead);
+                       nr_mac->if_inst->sl_ahead);
 
       ra->Msg2_frame = msg2_frame;
       ra->Msg2_slot = msg2_slot;
@@ -684,7 +684,7 @@ void nr_initiate_ra_proc(module_id_t module_idP,
       ra->preamble_index = preamble_index;
       ra->beam_id = beam_index;
 
-      LOG_D(NR_MAC,
+      LOG_I(NR_MAC,
             "[gNB %d][RAPROC] CC_id %d Frame %d Activating Msg2 generation in frame %d, slot %d using RA rnti %x SSB "
             "index %u RA index %d\n",
             module_idP,
@@ -801,7 +801,7 @@ void nr_generate_Msg3_retransmission(module_id_t module_idP, int CC_id, frame_t 
       return;
     }
 
-    LOG_D(NR_MAC, "[gNB %d][RAPROC] Frame %d, Slot %d : CC_id %d Scheduling retransmission of Msg3 in (%d,%d)\n",
+    LOG_I(NR_MAC, "[gNB %d][RAPROC] Frame %d, Slot %d : CC_id %d Scheduling retransmission of Msg3 in (%d,%d)\n",
           module_idP, frame, slot, CC_id, sched_frame, sched_slot);
 
     nfapi_nr_ul_tti_request_t *future_ul_tti_req = &RC.nrmac[module_idP]->UL_tti_req_ahead[CC_id][sched_slot];

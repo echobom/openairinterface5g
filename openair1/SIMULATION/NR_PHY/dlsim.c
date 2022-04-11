@@ -209,8 +209,7 @@ void config_common(int Mod_idP,
                    int ssb_SubcarrierOffset,
                    rrc_pdsch_AntennaPorts_t pdsch_AntennaPorts,
                    int pusch_AntennaPorts,
-		   NR_ServingCellConfigCommon_t *scc
-		   );
+                   NR_ServingCellConfigCommon_t *scc);
 
 int generate_dlsch_header(unsigned char *mac_header,
                           unsigned char num_sdus,
@@ -540,8 +539,7 @@ int main(int argc, char **argv)
     case 'x':
       g_nrOfLayers=atoi(optarg);
 
-      if ((g_nrOfLayers==0) ||
-          (g_nrOfLayers>4)) {
+      if ((g_nrOfLayers==0) || (g_nrOfLayers>4)) {
         printf("Unsupported nr Of Layers %d\n",g_nrOfLayers);
         exit(-1);
       }

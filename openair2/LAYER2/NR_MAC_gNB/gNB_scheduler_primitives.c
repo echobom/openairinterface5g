@@ -156,7 +156,7 @@ void set_dl_mcs(NR_sched_pdsch_t *sched_pdsch,
     uint16_t target_coderate,target_qm;
     if (cqi_idx>0) {
       int cqi_table = sched_ctrl->CSI_report.cri_ri_li_pmi_cqi_report.cqi_table;
-      if (cqi_table != mcs_table_idx) 
+      if (cqi_table != mcs_table_idx)
        LOG_W(NR_MAC,"Indices of MCS tables don't correspond yet, cri_ri_li_pmi_cqi_report.cqi_table %d, mcs_table_index %d\n",cqi_table,mcs_table_idx);
       switch (cqi_table) {
         case 0:
@@ -2305,11 +2305,11 @@ int add_new_nr_ue(module_id_t mod_idP, rnti_t rntiP, NR_CellGroupConfig_t *CellG
     UE_info->CellGroup[UE_id] = CellGroup;
     add_nr_list(&UE_info->list, UE_id);
     memset(&UE_info->mac_stats[UE_id], 0, sizeof(NR_mac_stats_t));
-    if (CellGroup && 
-        CellGroup->spCellConfig && 
+    if (CellGroup &&
+        CellGroup->spCellConfig &&
         CellGroup->spCellConfig->spCellConfigDedicated &&
         CellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig &&
-        CellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig->choice.setup 
+        CellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig->choice.setup
         )
       compute_csi_bitlen (CellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig->choice.setup, UE_info, UE_id, mod_idP);
     NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
@@ -2631,7 +2631,7 @@ void nr_csirs_scheduling(int Mod_idP,
       int period, offset;
 
       nfapi_nr_dl_tti_request_body_t *dl_req = &gNB_mac->DL_req[CC_id].dl_tti_request_body;
-      NR_BWP_t *genericParameters = sched_ctrl->active_bwp ? 
+      NR_BWP_t *genericParameters = sched_ctrl->active_bwp ?
                                     &sched_ctrl->active_bwp->bwp_Common->genericParameters:
                                     &gNB_mac->common_channels[0].ServingCellConfigCommon->downlinkConfigCommon->initialDownlinkBWP->genericParameters;
       for (int id = 0; id < csi_measconfig->nzp_CSI_RS_ResourceToAddModList->list.count; id++){
