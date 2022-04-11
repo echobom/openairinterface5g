@@ -51,7 +51,8 @@ void nr_fill_nfapi_pucch(module_id_t mod_id,
       &RC.nrmac[mod_id]->UL_tti_req_ahead[0][pucch->ul_slot];
   AssertFatal(future_ul_tti_req->SFN == pucch->frame
               && future_ul_tti_req->Slot == pucch->ul_slot,
-              "future UL_tti_req's frame.slot %d.%d does not match PUCCH %d.%d\n",
+              "Current %d.%d : future UL_tti_req's frame.slot %d.%d does not match PUCCH %d.%d\n",
+              frame,slot,
               future_ul_tti_req->SFN,
               future_ul_tti_req->Slot,
               pucch->frame,
@@ -161,7 +162,8 @@ void nr_schedule_pucch(int Mod_idP,
           || frameP != curr_pucch->frame
           || slotP != curr_pucch->ul_slot)
         continue;
-      LOG_D(NR_MAC,"Scheduling PUCCH[%d] RX for UE %d in %d.%d O_ack %d\n",i,UE_id,curr_pucch->frame,curr_pucch->ul_slot,O_ack);
+      if (O_csi > 0) LOG_D(NR_MAC,"Scheduling PUCCH[%d] RX for UE %d in %d.%d O_ack %d, O_sr %d, O_csi %d\n",
+	                   i,UE_id,curr_pucch->frame,curr_pucch->ul_slot,O_ack,O_sr,O_csi);
       nr_fill_nfapi_pucch(Mod_idP, frameP, slotP, curr_pucch, UE_id);
       memset(curr_pucch, 0, sizeof(*curr_pucch));
     }
@@ -566,6 +568,7 @@ void compute_csi_bitlen(NR_CSI_MeasConfig_t *csi_MeasConfig, NR_UE_info_t *UE_in
   struct NR_CSI_ResourceConfig *csi_resourceconfig;
 
   // for each CSI measurement report configuration (list of CSI-ReportConfig)
+  LOG_D(NR_MAC,"Searching %d csi_reports\n",csi_MeasConfig->csi_ReportConfigToAddModList->list.count);
   for (csi_report_id=0; csi_report_id < csi_MeasConfig->csi_ReportConfigToAddModList->list.count; csi_report_id++){
     struct NR_CSI_ReportConfig *csi_reportconfig = csi_MeasConfig->csi_ReportConfigToAddModList->list.array[csi_report_id];
     // MAC structure for CSI measurement reports (per UE and per report)
@@ -620,7 +623,7 @@ void compute_csi_bitlen(NR_CSI_MeasConfig_t *csi_MeasConfig, NR_UE_info_t *UE_in
       }
       else AssertFatal(1==0,"Only periodic resource configuration currently supported\n");
     }
-
+    LOG_D(NR_MAC,"nb_resources %d\n",nb_resources);
     // computation of bit length depending on the report type
     switch(reportQuantity_type){
       case (NR_CSI_ReportConfig__reportQuantity_PR_ssb_Index_RSRP):
@@ -708,7 +711,18 @@ void nr_csi_meas_reporting(int Mod_idP,
     const NR_CSI_MeasConfig_t *csi_measconfig = CellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig->choice.setup;
     AssertFatal(csi_measconfig->csi_ReportConfigToAddModList->list.count > 0,
                 "NO CSI report configuration available");
-    NR_PUCCH_Config_t *pucch_Config = sched_ctrl->active_ubwp->bwp_Dedicated->pucch_Config->choice.setup;
+    NR_PUCCH_Config_t *pucch_Config = NULL;
+    if (sched_ctrl->active_ubwp) {
+      pucch_Config = sched_ctrl->active_ubwp->bwp_Dedicated->pucch_Config->choice.setup;
+    } else if (RC.nrmac[Mod_idP]->UE_info.CellGroup[UE_id] &&
+             RC.nrmac[Mod_idP]->UE_info.CellGroup[UE_id]->spCellConfig &&
+             RC.nrmac[Mod_idP]->UE_info.CellGroup[UE_id]->spCellConfig->spCellConfigDedicated &&
+             RC.nrmac[Mod_idP]->UE_info.CellGroup[UE_id]->spCellConfig->spCellConfigDedicated->uplinkConfig &&
+             RC.nrmac[Mod_idP]->UE_info.CellGroup[UE_id]->spCellConfig->spCellConfigDedicated->uplinkConfig->initialUplinkBWP &&
+             RC.nrmac[Mod_idP]->UE_info.CellGroup[UE_id]->spCellConfig->spCellConfigDedicated->uplinkConfig->initialUplinkBWP->pucch_Config->choice.setup) {
+      pucch_Config = RC.nrmac[Mod_idP]->UE_info.CellGroup[UE_id]->spCellConfig->spCellConfigDedicated->uplinkConfig->initialUplinkBWP->pucch_Config->choice.setup;
+    }
+
 
     for (int csi_report_id = 0; csi_report_id < csi_measconfig->csi_ReportConfigToAddModList->list.count; csi_report_id++){
       NR_CSI_ReportConfig_t *csirep = csi_measconfig->csi_ReportConfigToAddModList->list.array[csi_report_id];
@@ -732,7 +746,7 @@ void nr_csi_meas_reporting(int Mod_idP,
         if (*pucchresset->resourceList.list.array[res_index] == pucchcsires->pucch_Resource)
           break;
       AssertFatal(res_index < n,
-                  "CSI resource not found among PUCCH resources\n");
+                  "CSI pucch resource %ld not found among PUCCH resources\n",pucchcsires->pucch_Resource);
 
       // find free PUCCH that is in order with possibly existing PUCCH
       // schedulings (other CSI, SR)
@@ -771,6 +785,7 @@ void nr_csi_meas_reporting(int Mod_idP,
             len = pucchres->format.choice.format2->nrofPRBs;
             mask = SL_to_bitmap(pucchres->format.choice.format2->startingSymbolIndex, pucchres->format.choice.format2->nrofSymbols);
             curr_pucch->simultaneous_harqcsi = pucch_Config->format2->choice.setup->simultaneousHARQ_ACK_CSI;
+            LOG_D(NR_MAC,"%d.%d Allocating PUCCH format 2, startPRB %d, nPRB %d, simulHARQ %d, num_bits %d\n", frame, sched_slot,start,len,curr_pucch->simultaneous_harqcsi,curr_pucch->csi_bits);
             break;
           case NR_PUCCH_Resource__format_PR_format3:
             len = pucchres->format.choice.format3->nrofPRBs;
@@ -812,7 +827,7 @@ static void handle_dl_harq(module_id_t mod_id,
     add_tail_nr_list(&UE_info->UE_sched_ctrl[UE_id].available_dl_harq, harq_pid);
     harq->round = 0;
     harq->ndi ^= 1;
-  } else if (harq->round >= MAX_HARQ_ROUNDS - 1) {
+  } else if (harq->round >= RC.nrmac[mod_id]->harq_round_max - 1) {
     add_tail_nr_list(&UE_info->UE_sched_ctrl[UE_id].available_dl_harq, harq_pid);
     harq->round = 0;
     harq->ndi ^= 1;
@@ -926,18 +941,26 @@ void tci_handling(module_id_t Mod_idP, int UE_id, frame_t frame, slot_t slot) {
   int ssb_index[MAX_NUM_SSB] = {0};
   int ssb_rsrp[MAX_NUM_SSB] = {0};
   uint8_t idx = 0;
-  int bwp_id  = 1; //TODO
   NR_UE_info_t *UE_info = &RC.nrmac[Mod_idP]->UE_info;
+  NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
+  int bwp_id  = sched_ctrl->active_bwp ? 1 : 0;
   NR_CellGroupConfig_t *CellGroup = UE_info->CellGroup[UE_id];
-  NR_BWP_Downlink_t *bwp = CellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list.array[bwp_id-1];
+  NR_BWP_Downlink_t *bwp = bwp_id>0 ?
+                           sched_ctrl->active_bwp:
+                           NULL;
+
+
   //bwp indicator
-  int n_dl_bwp = CellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list.count;
+  int n_dl_bwp=0;
+  if (CellGroup->spCellConfig->spCellConfigDedicated &&
+      CellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList)
+      n_dl_bwp = CellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list.count;
+
   uint8_t nr_ssbri_cri = 0;
   uint8_t nb_of_csi_ssb_report = UE_info->csi_report_template[UE_id][cqi_idx].nb_of_csi_ssb_report;
   int better_rsrp_reported = -140-(-0); /*minimum_measured_RSRP_value - minimum_differntail_RSRP_value*///considering the minimum RSRP value as better RSRP initially
   uint8_t diff_rsrp_idx = 0;
   uint8_t i, j;
-  NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
 
   if (n_dl_bwp < 4)
     pdsch_bwp_id = bwp_id;
@@ -1054,7 +1077,10 @@ void tci_handling(module_id_t Mod_idP, int UE_id, frame_t frame, slot_t slot) {
       }
     }
 
-    sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.tci_present_inDCI = bwp->bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList->list.array[bwp_id-1]->tci_PresentInDCI;
+    sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.tci_present_inDCI = bwp ?
+                                                                   bwp->bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList->list.array[bwp_id-1]->tci_PresentInDCI :
+                                                                   CellGroup->spCellConfig->spCellConfigDedicated->initialDownlinkBWP->pdcch_Config->choice.setup->controlResourceSetToAddModList->list.array[0]->tci_PresentInDCI;
+
 
     //filling pdsch tci state activation deactivation mac ce structure fields
     if(sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.tci_present_inDCI) {
@@ -1163,9 +1189,6 @@ void evaluate_rsrp_report(NR_UE_info_t *UE_info,
   // including ssb rsrp in mac stats
   stats->cumul_rsrp += strongest_ssb_rsrp;
   stats->num_rsrp_meas++;
-  LOG_D(MAC,"rsrp_id = %d rsrp = %d\n",
-        sched_ctrl->CSI_report.ssb_cri_report.RSRP,
-        get_measured_rsrp(sched_ctrl->CSI_report.ssb_cri_report.RSRP));
 }
 
 
@@ -1190,7 +1213,7 @@ int evaluate_ri_report(uint8_t *payload,
      if ((ri_restriction>>i)&0x01) {
        if(count == ri_index) {
          sched_ctrl->CSI_report.cri_ri_li_pmi_cqi_report.ri = i;
-         LOG_I(MAC,"CSI Reported Rank %d\n", i+1);
+         LOG_D(MAC,"CSI Reported Rank %d\n", i+1);
          return i;
        }
        count++;
@@ -1220,7 +1243,7 @@ void evaluate_cqi_report(uint8_t *payload,
   else
     AssertFatal(1==0,"CQI Table not present in RRC configuration\n");
   sched_ctrl->CSI_report.cri_ri_li_pmi_cqi_report.wb_cqi_1tb = temp_cqi;
-  LOG_I(MAC,"Wide-band CQI for the first TB %d\n", temp_cqi);
+  LOG_D(MAC,"Wide-band CQI for the first TB %d\n", temp_cqi);
   if (cqi_bitlen > 4) {
     temp_cqi = pickandreverse_bits(payload, 4, cumul_bits);
     sched_ctrl->CSI_report.cri_ri_li_pmi_cqi_report.wb_cqi_2tb = temp_cqi;
@@ -1245,7 +1268,7 @@ uint8_t evaluate_pmi_report(uint8_t *payload,
 
   sched_ctrl->CSI_report.cri_ri_li_pmi_cqi_report.pmi_x1 = temp_pmi&((1<<x1_bitlen)-1);
   sched_ctrl->CSI_report.cri_ri_li_pmi_cqi_report.pmi_x2 = (temp_pmi>>x1_bitlen)&((1<<x2_bitlen)-1);
-  LOG_I(MAC,"PMI Report: X1 %d X2 %d\n",
+  LOG_D(MAC,"PMI Report: X1 %d X2 %d\n",
         sched_ctrl->CSI_report.cri_ri_li_pmi_cqi_report.pmi_x1,
         sched_ctrl->CSI_report.cri_ri_li_pmi_cqi_report.pmi_x2);
 
@@ -1264,7 +1287,7 @@ int evaluate_li_report(uint8_t *payload,
 
   if (li_bitlen>0) {
     int temp_li = pickandreverse_bits(payload, li_bitlen, cumul_bits);
-    LOG_I(MAC,"LI %d\n",temp_li);
+    LOG_D(MAC,"LI %d\n",temp_li);
     sched_ctrl->CSI_report.cri_ri_li_pmi_cqi_report.li = temp_li;
   }
   return li_bitlen;
@@ -1607,7 +1630,6 @@ int nr_acknack_scheduling(int mod_id,
     // if TDD configuration is not present and the band is not FDD, it means it is a dynamic TDD configuration
     AssertFatal(RC.nrmac[mod_id]->common_channels[CC_id].frame_type == FDD,"Dynamic TDD not handled yet\n");
 
-  NR_sched_pucch_t *csi_pucch;
 
   /* for the moment, we consider:
    * * only pucch_sched[0] holds HARQ (and SR)
@@ -1644,13 +1666,18 @@ int nr_acknack_scheduling(int mod_id,
               pucch->csi_bits);
 
   /* if the currently allocated PUCCH of this UE is full, allocate it */
+  NR_sched_pucch_t *csi_pucch = &sched_ctrl->sched_pucch[1];
   if (pucch->dai_c == 2) {
     /* advance the UL slot information in PUCCH by one so we won't schedule in
      * the same slot again */
     const int f = pucch->frame;
     const int s = pucch->ul_slot;
     LOG_D(NR_MAC, "In %s: %d.%d DAI = 2 pucch currently in %d.%d, advancing by 1 slot\n", __FUNCTION__, frame, slot, f, s);
-    nr_fill_nfapi_pucch(mod_id, frame, slot, pucch, UE_id);
+    if (!(csi_pucch
+        && csi_pucch->csi_bits > 0
+        && csi_pucch->frame == f
+        && csi_pucch->ul_slot == s))
+      nr_fill_nfapi_pucch(mod_id, frame, slot, pucch, UE_id);
     memset(pucch, 0, sizeof(*pucch));
     pucch->frame = s == n_slots_frame - 1 ? (f + 1) % 1024 : f;
     if(((s + 1)%nr_slots_period) == 0)
@@ -1658,14 +1685,15 @@ int nr_acknack_scheduling(int mod_id,
     else
       pucch->ul_slot = (s + 1) % n_slots_frame;
     // we assume that only two indices over the array sched_pucch exist
-    csi_pucch = &sched_ctrl->sched_pucch[1];
     // skip the CSI PUCCH if it is present and if in the next frame/slot
     // and if we don't multiplex
     csi_pucch->r_pucch=-1;
-    if (csi_pucch->csi_bits > 0
+    if (csi_pucch
+        && csi_pucch->csi_bits > 0
         && csi_pucch->frame == pucch->frame
         && csi_pucch->ul_slot == pucch->ul_slot
         && !csi_pucch->simultaneous_harqcsi) {
+      LOG_D(NR_MAC,"Cannot multiplex csi_pucch for %d.%d\n",csi_pucch->frame,csi_pucch->ul_slot);
       nr_fill_nfapi_pucch(mod_id, frame, slot, csi_pucch, UE_id);
       memset(csi_pucch, 0, sizeof(*csi_pucch));
       pucch->frame = pucch->ul_slot == n_slots_frame - 1 ? (pucch->frame + 1) % 1024 : pucch->frame;
@@ -1717,7 +1745,10 @@ int nr_acknack_scheduling(int mod_id,
       const int s = pucch->ul_slot;
       const int n_slots_frame = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
       LOG_D(NR_MAC, "In %s: %d.%d DAI > 0, cannot reach timing for pucch in %d.%d, advancing slot by 1 and trying again\n", __FUNCTION__, frame, slot, f, s);
-      nr_fill_nfapi_pucch(mod_id, frame, slot, pucch, UE_id);
+      if (!(csi_pucch &&
+          csi_pucch->csi_bits > 0 &&
+          csi_pucch->frame == f &&
+          csi_pucch->ul_slot == s)) nr_fill_nfapi_pucch(mod_id, frame, slot, pucch, UE_id);
       memset(pucch, 0, sizeof(*pucch));
       pucch->frame = s == n_slots_frame - 1 ? (f + 1) % 1024 : f;
       if(((s + 1)%nr_slots_period) == 0)
@@ -1729,6 +1760,14 @@ int nr_acknack_scheduling(int mod_id,
 
     pucch->timing_indicator = i;
     pucch->dai_c++;
+    // if there is CSI in this slot update the HARQ information for that one too
+    if (csi_pucch &&
+        csi_pucch->csi_bits > 0 &&
+        csi_pucch->frame == pucch->frame &&
+        csi_pucch->ul_slot == pucch->ul_slot) {
+      csi_pucch->timing_indicator = i;
+      csi_pucch->dai_c++;
+    }
     // retain old resource indicator, and we are good
     LOG_D(NR_MAC, "In %s: %d.%d. DAI > 0, pucch allocated for %d.%d (index %d)\n", __FUNCTION__, frame,slot,pucch->frame,pucch->ul_slot,pucch->timing_indicator);
     return 0;
@@ -1802,8 +1841,6 @@ int nr_acknack_scheduling(int mod_id,
     return -1;
   }
 
-  // is there already CSI in this slot?
-  csi_pucch = &sched_ctrl->sched_pucch[1];
   if (csi_pucch &&
       csi_pucch->csi_bits > 0 &&
       csi_pucch->frame == pucch->frame &&
@@ -1813,6 +1850,7 @@ int nr_acknack_scheduling(int mod_id,
     // FIXME currently we support at most 11 bits in pucch2 so skip also in that case
     if(!csi_pucch->simultaneous_harqcsi
        || ((csi_pucch->csi_bits + csi_pucch->dai_c) >= 11)) {
+      LOG_D(NR_MAC,"Cannot multiplex csi_pucch %d +csi_pucch->dai_c %d for %d.%d\n",csi_pucch->csi_bits,csi_pucch->dai_c,csi_pucch->frame,csi_pucch->ul_slot);
       nr_fill_nfapi_pucch(mod_id, frame, slot, csi_pucch, UE_id);
       memset(csi_pucch, 0, sizeof(*csi_pucch));
       /* advance the UL slot information in PUCCH by one so we won't schedule in
@@ -1831,6 +1869,11 @@ int nr_acknack_scheduling(int mod_id,
     else {
       csi_pucch->timing_indicator = ind_found;
       csi_pucch->dai_c++;
+      // keep updating format 2 indicator
+      pucch->timing_indicator = ind_found; // index in the list of timing indicators
+      pucch->dai_c++;
+
+      LOG_D(NR_MAC,"multiplexing csi_pucch %d +csi_pucch->dai_c %d for %d.%d\n",csi_pucch->csi_bits,csi_pucch->dai_c,csi_pucch->frame,csi_pucch->ul_slot);
       return 1;
     }
   }
@@ -1931,10 +1974,50 @@ void nr_sr_reporting(int Mod_idP, frame_t SFN, sub_frame_t slot)
             && pdu->initial_cyclic_shift == pucch_res->format.choice.format0->initialCyclicShift
             && pdu->nr_of_symbols == pucch_res->format.choice.format0->nrofSymbols
             && pdu->start_symbol_index == pucch_res->format.choice.format0->startingSymbolIndex) {
-          LOG_D(NR_MAC,"%4d.%2d adding SR_flag 1 to PUCCH nFAPI SR for RNTI %04x\n", SFN, slot, pdu->rnti);
+          LOG_D(NR_MAC,"%4d.%2d adding SR_flag 1 to PUCCH format 0 nFAPI SR for RNTI %04x\n", SFN, slot, pdu->rnti);
           pdu->sr_flag = 1;
           nfapi_allocated = true;
           break;
+        }
+        else if (pdu->rnti == UE_info->rnti[UE_id]
+            && pdu->format_type == 2 // does not use NR_PUCCH_Resource__format_PR_format0
+            && pdu->nr_of_symbols == pucch_res->format.choice.format2->nrofSymbols
+            && pdu->start_symbol_index == pucch_res->format.choice.format2->startingSymbolIndex) {
+          LOG_D(NR_MAC,"%4d.%2d adding SR_flag 1 to PUCCH format 2 nFAPI SR for RNTI %04x\n", SFN, slot, pdu->rnti);
+          pdu->sr_flag = 1;
+          nfapi_allocated = true;
+          break;
+
+        }
+        else if (pdu->rnti == UE_info->rnti[UE_id]
+            && pdu->format_type == 1 // does not use NR_PUCCH_Resource__format_PR_format0
+            && pdu->nr_of_symbols == pucch_res->format.choice.format1->nrofSymbols
+            && pdu->start_symbol_index == pucch_res->format.choice.format1->startingSymbolIndex) {
+          LOG_D(NR_MAC,"%4d.%2d adding SR_flag 1 to PUCCH format 1 nFAPI SR for RNTI %04x\n", SFN, slot, pdu->rnti);
+          pdu->sr_flag = 1;
+          nfapi_allocated = true;
+          break;
+
+        }
+        else if (pdu->rnti == UE_info->rnti[UE_id]
+            && pdu->format_type == 3 // does not use NR_PUCCH_Resource__format_PR_format0
+            && pdu->nr_of_symbols == pucch_res->format.choice.format3->nrofSymbols
+            && pdu->start_symbol_index == pucch_res->format.choice.format3->startingSymbolIndex) {
+          LOG_D(NR_MAC,"%4d.%2d adding SR_flag 1 to PUCCH format 3 nFAPI SR for RNTI %04x\n", SFN, slot, pdu->rnti);
+          pdu->sr_flag = 1;
+          nfapi_allocated = true;
+          break;
+
+        }
+        else if (pdu->rnti == UE_info->rnti[UE_id]
+            && pdu->format_type == 4 // does not use NR_PUCCH_Resource__format_PR_format0
+            && pdu->nr_of_symbols == pucch_res->format.choice.format4->nrofSymbols
+            && pdu->start_symbol_index == pucch_res->format.choice.format4->startingSymbolIndex) {
+          LOG_D(NR_MAC,"%4d.%2d adding SR_flag 1 to PUCCH format 4 nFAPI SR for RNTI %04x\n", SFN, slot, pdu->rnti);
+          pdu->sr_flag = 1;
+          nfapi_allocated = true;
+          break;
+
         }
       }
 

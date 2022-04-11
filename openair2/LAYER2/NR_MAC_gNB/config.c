@@ -351,15 +351,14 @@ void config_common(int Mod_idP, int ssb_SubcarrierOffset, rrc_pdsch_AntennaPorts
     ssb_SubcarrierOffset_limit = 12;
   }
   if (ssb_SubcarrierOffset<ssb_SubcarrierOffset_limit)
-    AssertFatal(sco==(scs_scaling * ssb_SubcarrierOffset),"absoluteFrequencySSB has a subcarrier offset of %d while it should be %d\n",sco/scs_scaling,ssb_SubcarrierOffset);
-
+    AssertFatal(sco==(scs_scaling * (ssb_SubcarrierOffset>>(cfg->ssb_config.scs_common.value))),"absoluteFrequencySSB has a subcarrier offset of %d while it should be %d\n",sco/scs_scaling,ssb_SubcarrierOffset);
   cfg->ssb_table.ssb_offset_point_a.value = absolute_diff/(12*scs_scaling) - 10; //absoluteFrequencySSB is the central frequency of SSB which is made by 20RBs in total
   cfg->ssb_table.ssb_offset_point_a.tl.tag = NFAPI_NR_CONFIG_SSB_OFFSET_POINT_A_TAG;
   cfg->num_tlv++;
   cfg->ssb_table.ssb_period.value = *scc->ssb_periodicityServingCell;
   cfg->ssb_table.ssb_period.tl.tag = NFAPI_NR_CONFIG_SSB_PERIOD_TAG;
   cfg->num_tlv++;
-  cfg->ssb_table.ssb_subcarrier_offset.value = ssb_SubcarrierOffset;
+  cfg->ssb_table.ssb_subcarrier_offset.value = ssb_SubcarrierOffset>>(cfg->ssb_config.scs_common.value);
   cfg->ssb_table.ssb_subcarrier_offset.tl.tag = NFAPI_NR_CONFIG_SSB_SUBCARRIER_OFFSET_TAG;
   cfg->num_tlv++;
 
@@ -476,14 +475,11 @@ int rrc_mac_config_req_gNB(module_id_t Mod_idP,
     AssertFatal(RC.nrmac[Mod_idP]->UL_tti_req_ahead[0],
                 "could not allocate memory for RC.nrmac[]->UL_tti_req_ahead[]\n");
     /* fill in slot/frame numbers: slot is fixed, frame will be updated by scheduler
-       extern sf_ahead is initialized in ru_thread but that function is not executed yet here*/
-    const uint16_t sf_ahead = (uint16_t) ceil((float)6/(0x01<<(*scc->ssbSubcarrierSpacing)));
-    const uint16_t sl_ahead = sf_ahead * (0x01<<(*scc->ssbSubcarrierSpacing));
-    /* consider that scheduler runs sl_ahead: the first sl_ahead slots are
-     * already "in the past" and thus we put frame 1 instead of 0!*/
+     * consider that scheduler runs sl_ahead: the first sl_ahead slots are
+     * already "in the past" and thus we put frame 1 instead of 0! */
     for (int i = 0; i < n; ++i) {
       nfapi_nr_ul_tti_request_t *req = &RC.nrmac[Mod_idP]->UL_tti_req_ahead[0][i];
-      req->SFN = i < (sl_ahead-1);
+      req->SFN = i < (RC.nrmac[Mod_idP]->if_inst->sl_ahead-1);
       req->Slot = i;
     }
     RC.nrmac[Mod_idP]->common_channels[0].vrb_map_UL =
@@ -535,12 +531,9 @@ int rrc_mac_config_req_gNB(module_id_t Mod_idP,
       AssertFatal(RC.nrmac[Mod_idP]->common_channels[0].frame_type == FDD,"Dynamic TDD not handled yet\n");
 
     for (int slot = 0; slot < n; ++slot) {
-      /* FIXME: it seems there is a problem with slot 0/10/slots right after UL:
-       * we just get retransmissions. Thus, do not schedule such slots in DL in TDD */
       if (RC.nrmac[Mod_idP]->common_channels[0].frame_type == FDD ||
-          (slot % nr_slots_period != 0)){
+          (slot != 0))
         RC.nrmac[Mod_idP]->dlsch_slot_bitmap[slot / 64] |= (uint64_t)((slot % nr_slots_period) < nr_dl_slots) << (slot % 64);
-      }
       RC.nrmac[Mod_idP]->ulsch_slot_bitmap[slot / 64] |= (uint64_t)((slot % nr_slots_period) >= nr_ulstart_slot) << (slot % 64);
 
       LOG_I(NR_MAC, "In %s: slot %d DL %d UL %d\n",
@@ -693,11 +686,15 @@ int rrc_mac_config_req_gNB(module_id_t Mod_idP,
                                                     genericParameters,
                                                     RC.nrmac[Mod_idP]->type0_PDCCH_CSS_config);
       sched_ctrl->maxL = 2;
+      if (CellGroup->spCellConfig &&
+          CellGroup->spCellConfig->spCellConfigDedicated &&
+          CellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig &&
+          CellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig->choice.setup
+        )
+      compute_csi_bitlen (CellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig->choice.setup, UE_info, UE_id, Mod_idP);
     }
   }
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_RRC_MAC_CONFIG, VCD_FUNCTION_OUT);
-  
-    
-  return 0;
 
+  return 0;
 }// END rrc_mac_config_req_gNB

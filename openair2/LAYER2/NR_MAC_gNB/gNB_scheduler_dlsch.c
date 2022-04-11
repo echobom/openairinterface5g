@@ -604,17 +604,8 @@ bool allocate_dl_retransmission(module_id_t module_id,
   } else {
     /* the retransmission will use a different time domain allocation, check
      * that we have enough resources */
-
     NR_pdsch_semi_static_t temp_ps = *ps;
-    nr_set_pdsch_semi_static(sib1,
-                             scc,
-                             UE_info->CellGroup[UE_id],
-                             sched_ctrl->active_bwp,
-                             bwpd,
-                             tda,
-                             ps->nrOfLayers,
-                             sched_ctrl,
-                             &temp_ps);
+    nr_set_pdsch_semi_static(sib1,scc, cg, sched_ctrl->active_bwp, bwpd,tda, ps->nrOfLayers, sched_ctrl, &temp_ps);
     while (rbStart < bwpSize &&
            !(rballoc_mask[rbStart]&SL_to_bitmap(temp_ps.startSymbolIndex, temp_ps.nrOfSymbols)))
       rbStart++;
@@ -1063,6 +1054,8 @@ void nr_schedule_ue_spec(module_id_t module_id,
   if (!is_xlsch_in_slot(gNB_mac->dlsch_slot_bitmap[slot / 64], slot))
     return;
 
+  //if (slot==7 || slot == 17) return;
+
   /* PREPROCESSOR */
   gNB_mac->pre_processor_dl(module_id, frame, slot);
 
@@ -1402,7 +1395,6 @@ void nr_schedule_ue_spec(module_id_t module_id,
 
       start_meas(&gNB_mac->rlc_data_req);
       if (sched_ctrl->num_total_bytes > 0) {
-
         /* loop over all activated logical channels */
         for (int i = 0; i < sched_ctrl->dl_lc_num; ++i) {
 

@@ -1006,7 +1006,8 @@ rrc_gNB_generate_dedicatedRRCReconfiguration(
 
   memset(buffer, 0, sizeof(buffer));
   cellGroupConfig = calloc(1, sizeof(NR_CellGroupConfig_t));
-  fill_mastercellGroupConfig(cellGroupConfig, ue_context_pP->ue_context.masterCellGroup);
+  fill_mastercellGroupConfig(cellGroupConfig, ue_context_pP->ue_context.masterCellGroup,
+                             rrc->um_on_default_drb);
   size = do_RRCReconfiguration(ctxt_pP, buffer, sizeof(buffer),
                                 xid,
                                 *SRB_configList2,
@@ -3202,7 +3203,7 @@ static void rrc_DU_process_ue_context_setup_request(MessageDef *msg_p, const cha
 
   NR_CellGroupConfig_t *cellGroupConfig;
   cellGroupConfig = calloc(1, sizeof(NR_CellGroupConfig_t));
-  fill_mastercellGroupConfig(cellGroupConfig, ue_context_p->ue_context.masterCellGroup);
+  fill_mastercellGroupConfig(cellGroupConfig, ue_context_p->ue_context.masterCellGroup,rrc->um_on_default_drb);
 
   /* Configure SRB2 */
   NR_SRB_ToAddMod_t            *SRB2_config          = NULL;
