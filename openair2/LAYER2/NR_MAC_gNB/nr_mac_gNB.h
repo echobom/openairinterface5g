@@ -656,7 +656,7 @@ typedef struct {
   /// order in which DLSCH scheduler should allocate LCs
   uint8_t dl_lc_ids[NR_MAX_NUM_LCID];
 
-  NR_QoS_config_t nr_QoS_config[NR_MAX_NUM_LCID][NR_MAX_NUM_QFI];
+  NR_QoS_config_t nr_QoS_config[NR_MAX_NUM_LCID];
 
 } NR_UE_sched_ctrl_t;
 
