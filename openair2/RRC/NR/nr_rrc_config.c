@@ -248,7 +248,7 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay){
 
   //TODO change to accomodate for SRS
 
-  int temp_min_delay = 6; // k2 = 2 or 3 won'r work as well as higher values
+  int temp_min_delay = 5; // k2 = 2 or 3 won'r work as well as higher values
   int k2 = (min_fb_delay<temp_min_delay)?temp_min_delay:min_fb_delay;
 
   uint8_t DELTA[4]= {2,3,4,6}; // Delta parameter for Msg3

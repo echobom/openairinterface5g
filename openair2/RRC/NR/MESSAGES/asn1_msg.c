@@ -600,12 +600,12 @@ uint8_t do_SIB1_NR(rrc_gNB_carrier_data_t *carrier,
   }
 
   ServCellCom->ssb_PeriodicityServingCell = *configuration->scc->ssb_periodicityServingCell;
-  if (configuration->scc->tdd_UL_DL_ConfigurationCommon) {
-    ServCellCom->tdd_UL_DL_ConfigurationCommon = CALLOC(1,sizeof(struct NR_TDD_UL_DL_ConfigCommon));
+  /*if (configuration->scc->tdd_UL_DL_ConfigurationCommon) {
+    ServCellCom->tdd_UL_DL_ConfigurationCommon = NULL; //CALLOC(1,sizeof(struct NR_TDD_UL_DL_ConfigCommon));
     ServCellCom->tdd_UL_DL_ConfigurationCommon->referenceSubcarrierSpacing = configuration->scc->tdd_UL_DL_ConfigurationCommon->referenceSubcarrierSpacing;
     ServCellCom->tdd_UL_DL_ConfigurationCommon->pattern1 = configuration->scc->tdd_UL_DL_ConfigurationCommon->pattern1;
     ServCellCom->tdd_UL_DL_ConfigurationCommon->pattern2 = configuration->scc->tdd_UL_DL_ConfigurationCommon->pattern2;
-  }
+  }*/
   ServCellCom->ss_PBCH_BlockPower = configuration->scc->ss_PBCH_BlockPower;
 
   // ims-EmergencySupport

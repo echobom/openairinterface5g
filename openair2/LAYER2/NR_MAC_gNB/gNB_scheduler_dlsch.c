@@ -64,8 +64,8 @@ void calculate_preferred_dl_tda(module_id_t module_id, const NR_BWP_Downlink_t *
   NR_ServingCellConfigCommon_t *scc = nrmac->common_channels->ServingCellConfigCommon;
   frame_type_t frame_type = nrmac->common_channels->frame_type;
   const int n = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
-  const NR_TDD_UL_DL_Pattern_t *tdd =
-    scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
+  const NR_TDD_UL_DL_Pattern_t *tdd = NULL;
+
   int symb_dlMixed = 0;
   int nr_mix_slots = 0;
   int nr_slots_period = n;
@@ -73,11 +73,20 @@ void calculate_preferred_dl_tda(module_id_t module_id, const NR_BWP_Downlink_t *
   if (tdd) {
     symb_dlMixed = (1 << tdd->nrofDownlinkSymbols) - 1;
     nr_mix_slots = tdd->nrofDownlinkSymbols != 0 || tdd->nrofUplinkSymbols != 0;
-    nr_slots_period /= get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
-  } else
+    nr_slots_period = n / get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
+  } else {
     // if TDD configuration is not present and the band is not FDD, it means it is a dynamic TDD configuration
-    AssertFatal(nrmac->common_channels->frame_type == FDD,"Dynamic TDD not handled yet\n");
-
+    // AssertFatal(nrmac->common_channels->frame_type == FDD,"Dynamic TDD not handled yet\n");
+    symb_dlMixed = (1 << RC.nrmac[module_id]->temp_nrofDownlinkSymbols) - 1;
+    nr_mix_slots = RC.nrmac[module_id]->temp_nrofDownlinkSymbols != 0 || RC.nrmac[module_id]->temp_nrofUplinkSymbols != 0;
+    nr_slots_period = n / get_nb_periods_per_frame(RC.nrmac[module_id]->temp_dl_UL_TransmissionPeriodicity);
+  }
+  LOG_W(NR_MAC,
+        "%s(), nrofDownlinkSlots %d, nrofUplinkSlots %d, nrofDownlinkSymbols %d, nrofUplinkSymbols %d, period %d, "
+        "symb_dlMixed %d, nr_mix_slots %d, nr_slots_period %d\n",
+        __func__, RC.nrmac[module_id]->temp_nrofDownlinkSlots, RC.nrmac[module_id]->temp_nrofUplinkSlots,
+        RC.nrmac[module_id]->temp_nrofDownlinkSymbols, RC.nrmac[module_id]->temp_nrofUplinkSymbols, RC.nrmac[module_id]->temp_dl_UL_TransmissionPeriodicity,
+        symb_dlMixed, nr_mix_slots, nr_slots_period);
   int target_ss;
 
   if (bwp) {
@@ -142,15 +151,21 @@ void calculate_preferred_dl_tda(module_id_t module_id, const NR_BWP_Downlink_t *
 
   nrmac->preferred_dl_tda[bwp_id] = malloc(n * sizeof(*nrmac->preferred_dl_tda[bwp_id]));
 
+  int nb_mix_slot = RC.nrmac[module_id]->temp_nrofMixSlots;
+  int nb_dl_slot = RC.nrmac[module_id]->temp_nrofDownlinkSlots;
+  if (nb_mix_slot > 1)
+    nb_dl_slot = nr_slots_period - RC.nrmac[module_id]->temp_nrofUplinkSlots - nb_mix_slot;
+  LOG_W(NR_MAC, "%s(), nb_mix_slot %d, nb_dl_slot %d\n", __func__, nb_mix_slot, nb_dl_slot);
   for (int i = 0; i < n; ++i) {
     nrmac->preferred_dl_tda[bwp_id][i] = -1;
-
-    if (frame_type == FDD || i % nr_slots_period < tdd->nrofDownlinkSlots)
+    int use_nrofDownlinkSlots = tdd == NULL ? nb_dl_slot : tdd->nrofDownlinkSlots;
+    if (frame_type == FDD || i % nr_slots_period < use_nrofDownlinkSlots)
       nrmac->preferred_dl_tda[bwp_id][i] = 0;
-    else if (nr_mix_slots && i % nr_slots_period == tdd->nrofDownlinkSlots)
+    //else if (nr_mix_slots && i % nr_slots_period == use_nrofDownlinkSlots)
+    else if (nr_mix_slots && i % nr_slots_period < (use_nrofDownlinkSlots + nb_mix_slot))
       nrmac->preferred_dl_tda[bwp_id][i] = tdaMi;
 
-    LOG_D(MAC, "slot %d preferred_dl_tda %d\n", i, nrmac->preferred_dl_tda[bwp_id][i]);
+    LOG_W(MAC, "slot %d preferred_dl_tda %d\n", i, nrmac->preferred_dl_tda[bwp_id][i]);
   }
 }
 
@@ -1077,6 +1092,9 @@ void nr_schedule_ue_spec(module_id_t module_id,
 
   if (!is_xlsch_in_slot(gNB_mac->dlsch_slot_bitmap[slot / 64], slot))
     return;
+
+  if (frame == 500)
+    LOG_W(NR_MAC, "%d.%d, %s()\n", frame, slot, __func__);
 
   /* PREPROCESSOR */
   gNB_mac->pre_processor_dl(module_id, frame, slot);

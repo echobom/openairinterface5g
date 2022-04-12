@@ -371,7 +371,7 @@ static void match_crc_rx_pdu(nfapi_nr_rx_data_indication_t *rx_ind, nfapi_nr_crc
           crc_ind->number_crcs, rx_ind->number_of_pdus);
   }
 }
-
+int temp_c = 0;
 void NR_UL_indication(NR_UL_IND_t *UL_info) {
   AssertFatal(UL_info!=NULL,"UL_info is null\n");
 #ifdef DUMP_FAPI
@@ -388,6 +388,80 @@ void NR_UL_indication(NR_UL_IND_t *UL_info) {
         gnb_rach_ind_queue.num_items,
         gnb_rx_ind_queue.num_items,
         gnb_crc_ind_queue.num_items);
+
+
+  // update tdd table
+  int temp_f = UL_info->frame;
+  int temp_s = UL_info->slot;
+  if (temp_f == 500 && temp_s == 0) temp_c += temp_f;
+  if (temp_c == 1500 && temp_s == 0) {
+    temp_c = 0;
+    int slot_number = 0;
+    int mu = mac->common_channels->ServingCellConfigCommon->uplinkConfigCommon->frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing;
+    int nb_slots_to_set = TDD_CONFIG_NB_FRAMES*(1<<mu)*NR_NUMBER_OF_SUBFRAMES_PER_FRAME; // nb_slots_to_set = 40;
+    nfapi_nr_config_request_scf_t *cfg_test = &RC.nrmac[module_id]->config[0];
+    int nb_periods_per_frame = 2;
+    int nb_slots_per_period = ((1<<mu) * NR_NUMBER_OF_SUBFRAMES_PER_FRAME) / nb_periods_per_frame;
+
+    LOG_W(NR_PHY, "%s(), %d.%d, update tdd_table, "
+                  "nrofDownlinkSlots %d, nrofUplinkSlots %d, nrofDownlinkSymbols %d, nrofUplinkSymbols %d, nrofMixSlots %d, "
+                  "mu d, nb_slots_to_set %d, nb_periods_per_frame %d, nb_slots_per_period %d\n",
+                  __func__, temp_f, temp_s,
+                  RC.nrmac[module_id]->temp_nrofDownlinkSlots,
+                  RC.nrmac[module_id]->temp_nrofUplinkSlots,
+                  RC.nrmac[module_id]->temp_nrofDownlinkSymbols,
+                  RC.nrmac[module_id]->temp_nrofUplinkSymbols,
+                  RC.nrmac[module_id]->temp_nrofMixSlots,
+                  mu,
+                  nb_slots_to_set,
+                  nb_periods_per_frame,
+                  nb_slots_per_period);
+
+    int nr_dl_slot = RC.nrmac[module_id]->temp_nrofDownlinkSlots;
+    if (RC.nrmac[module_id]->temp_nrofMixSlots > 1)
+      nr_dl_slot = nb_slots_per_period - RC.nrmac[module_id]->temp_nrofUplinkSlots - RC.nrmac[module_id]->temp_nrofMixSlots;
+    while (slot_number != nb_slots_to_set) {
+      // update dl slot
+      if (nr_dl_slot != 0) {
+        for (int number_of_symbol = 0; number_of_symbol < nr_dl_slot * NR_NUMBER_OF_SYMBOLS_PER_SLOT; number_of_symbol++) {
+          cfg_test->tdd_table.max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol % NR_NUMBER_OF_SYMBOLS_PER_SLOT].slot_config.value = 0;
+
+          if ((number_of_symbol + 1) % NR_NUMBER_OF_SYMBOLS_PER_SLOT == 0)
+            slot_number++;
+        }
+      }
+      // update mix slot
+      for (int mix_i = 0; mix_i < RC.nrmac[module_id]->temp_nrofMixSlots; mix_i++) {
+        if (RC.nrmac[module_id]->temp_nrofDownlinkSymbols != 0 || RC.nrmac[module_id]->temp_nrofUplinkSymbols != 0) {
+          // dl symbol
+          for (int number_of_symbol = 0;
+               number_of_symbol < RC.nrmac[module_id]->temp_nrofDownlinkSymbols; number_of_symbol++) {
+            cfg_test->tdd_table.max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol].slot_config.value = 0;
+          }
+          for (int number_of_symbol = RC.nrmac[module_id]->temp_nrofDownlinkSymbols; number_of_symbol <
+                                                                                     NR_NUMBER_OF_SYMBOLS_PER_SLOT -
+                                                                                     RC.nrmac[module_id]->temp_nrofUplinkSymbols; number_of_symbol++) {
+            cfg_test->tdd_table.max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol].slot_config.value = 2;
+          }
+          for (int number_of_symbol = NR_NUMBER_OF_SYMBOLS_PER_SLOT - RC.nrmac[module_id]->temp_nrofUplinkSymbols;
+               number_of_symbol < NR_NUMBER_OF_SYMBOLS_PER_SLOT; number_of_symbol++) {
+            cfg_test->tdd_table.max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol].slot_config.value = 1;
+          }
+
+          slot_number++;
+        }
+      }
+      // update ul slot
+      if (RC.nrmac[module_id]->temp_nrofUplinkSlots != 0) {
+        for (int number_of_symbol = 0; number_of_symbol < RC.nrmac[module_id]->temp_nrofUplinkSlots * NR_NUMBER_OF_SYMBOLS_PER_SLOT; number_of_symbol++) {
+          cfg_test->tdd_table.max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol % NR_NUMBER_OF_SYMBOLS_PER_SLOT].slot_config.value = 1;
+
+          if ((number_of_symbol + 1) % NR_NUMBER_OF_SYMBOLS_PER_SLOT == 0)
+            slot_number++;
+        }
+      }
+    }
+  }
 
   nfapi_nr_rach_indication_t *rach_ind = NULL;
   nfapi_nr_uci_indication_t *uci_ind = NULL;

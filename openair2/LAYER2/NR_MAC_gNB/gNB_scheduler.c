@@ -270,7 +270,8 @@ bool is_xlsch_in_slot(uint64_t bitmap, sub_frame_t slot) {
   if (slot>=64) return false; //quickfix for FR2 where there are more than 64 slots (bitmap to be removed)
   return (bitmap >> slot) & 0x01;
 }
-
+int temp_mac = 0;
+bool change_tag_mac = 1;
 void gNB_dlsch_ulsch_scheduler(module_id_t module_idP,
                                frame_t frame,
                                sub_frame_t slot){
@@ -346,6 +347,50 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP,
      LOG_I(NR_MAC,"Frame.Slot %d.%d\n%s\n",frame,slot,stats_output);
   }
 
+  int temp_f = frame;
+  int temp_s = slot;
+  if (temp_f == 500 && temp_s == 0) temp_mac += temp_f;
+  if (temp_mac == 1500 && temp_s == 0) {
+    temp_mac = 0;
+    LOG_W(NR_MAC, "%s(), %d.%d, update tdd pattern and change bitmap\n", __func__, temp_f, temp_s);
+    RC.nrmac[module_idP]->temp_dl_UL_TransmissionPeriodicity = 6;
+    RC.nrmac[module_idP]->temp_nrofDownlinkSlots = change_tag_mac ? 7 : 8;
+    RC.nrmac[module_idP]->temp_nrofUplinkSlots = change_tag_mac ? 2 : 1;
+    RC.nrmac[module_idP]->temp_nrofDownlinkSymbols = 6;
+    RC.nrmac[module_idP]->temp_nrofUplinkSymbols = 4;
+    // DL 8, UL 1, MIX 1 => DL bitmap, 0x7F9FE: 0111111110, 0111111110; UL bitmap, 0xC0300: 1100000000, 1100000000
+    // DL 8, UL 1, MIX 2 => DL bitmap, 0x7F9FE: 0111111110, 0111111110; UL bitmap, 0xE0380: 1110000000, 1110000000
+    // DL 8, UL 1, MIX 7 => DL bitmap, 0x7F9FE: 0111111110, 0111111110; UL bitmap, 0xFF3FC: 1111111100, 1111111100
+    // DL 7, UL 2, MIX 1 => DL bitmap, 0x3f8fe: 0011111110, 0011111110; UL bitmap, 0xe0380: 1110000000, 1110000000
+    // DL 7, UL 2, MIX 2 => DL bitmap, 0x3f8fe: 0011111110, 0011111110; UL bitmap, 0xF03C0: 1111000000, 1111000000
+    // DL 7, UL 2, MIX 7 => DL bitmap, 0x3f8fe: 0011111110, 0011111110; UL bitmap, 0xFFBFE: 1111111110, 1111111110
+    // DL 6, UL 3, MIX 1 => DL bitmap, 0x1F87E: 0001111110, 0001111110; UL bitmap, 0xF03C0: 1111000000, 1111000000
+    // x DL 5, UL 4 => DL bitmap, 0xF83E:  0000111110, 0000111110; UL bitmap, 0xF83E0: 1111100000, 1111100000
+    RC.nrmac[module_idP]->dlsch_slot_bitmap[temp_s / 64] = change_tag_mac ? 0x3f8fe : 0x7F9FE;
+    RC.nrmac[module_idP]->ulsch_slot_bitmap[temp_s / 64] = change_tag_mac ? 0xF03C0 : 0xE0380;
+    change_tag_mac ^= 1;
+
+    // update dl tda
+    LOG_W(NR_MAC, "%s(), %d.%d, update dl tda\n", __func__, temp_f, temp_s);
+    // calculate_preferred_dl_tda(module_idP, NULL);
+    const int bwp_id = 0;
+    int n = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
+    int nr_slots_period = n / get_nb_periods_per_frame(RC.nrmac[module_idP]->temp_dl_UL_TransmissionPeriodicity);
+    int nb_mix_slot = RC.nrmac[module_idP]->temp_nrofMixSlots;
+    int nb_dl_slot = RC.nrmac[module_idP]->temp_nrofDownlinkSlots;
+    if (nb_mix_slot > 1)
+      nb_dl_slot = nr_slots_period - RC.nrmac[module_idP]->temp_nrofUplinkSlots - nb_mix_slot;
+    for (int i = 0; i < n; ++i) {
+      RC.nrmac[module_idP]->preferred_dl_tda[bwp_id][i] = -1;
+      int use_nrofDownlinkSlots = nb_dl_slot;
+      if (i % nr_slots_period < use_nrofDownlinkSlots)
+        RC.nrmac[module_idP]->preferred_dl_tda[bwp_id][i] = 0;
+      //else if (nr_mix_slots && i % nr_slots_period == use_nrofDownlinkSlots)
+      else if (nb_mix_slot && i % nr_slots_period < (use_nrofDownlinkSlots + nb_mix_slot))
+        RC.nrmac[module_idP]->preferred_dl_tda[bwp_id][i] = 1;
+      LOG_D(NR_MAC, "slot %d preferred_dl_tda %d\n", i, RC.nrmac[module_idP]->preferred_dl_tda[bwp_id][i]);
+    }
+  }
   // This schedules MIB
   schedule_nr_mib(module_idP, frame, slot);
 

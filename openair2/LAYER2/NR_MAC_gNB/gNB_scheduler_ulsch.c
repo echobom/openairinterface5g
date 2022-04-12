@@ -80,11 +80,19 @@ void calculate_preferred_ul_tda(module_id_t module_id, const NR_BWP_Uplink_t *ub
   if (tdd) {
     symb_ulMixed = ((1 << tdd->nrofUplinkSymbols) - 1) << (14 - tdd->nrofUplinkSymbols);
     nr_mix_slots = tdd->nrofDownlinkSymbols != 0 || tdd->nrofUplinkSymbols != 0;
-    nr_slots_period /= get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
-  }
-  else
+    nr_slots_period = n / get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
+  } else {
     // if TDD configuration is not present and the band is not FDD, it means it is a dynamic TDD configuration
     AssertFatal(nrmac->common_channels->frame_type == FDD,"Dynamic TDD not handled yet\n");
+    symb_ulMixed = ((1 << RC.nrmac[module_id]->temp_nrofUplinkSymbols) - 1) << (14 - RC.nrmac[module_id]->temp_nrofUplinkSymbols);
+    nr_mix_slots = RC.nrmac[module_id]->temp_nrofDownlinkSymbols != 0 || RC.nrmac[module_id]->temp_nrofUplinkSymbols != 0;
+    nr_slots_period = n / get_nb_periods_per_frame(RC.nrmac[module_id]->temp_dl_UL_TransmissionPeriodicity);
+  }
+  LOG_I(NR_MAC, "%s(), nrofDownlinkSlots %d, nrofUplinkSlots %d, nrofDownlinkSymbols %d, nrofUplinkSymbols %d, period %d, "
+                "symb_ulMixed %d, nr_mix_slots %d, nr_slots_period %d\n",
+                __func__, RC.nrmac[module_id]->temp_nrofDownlinkSlots, RC.nrmac[module_id]->temp_nrofUplinkSlots,
+                RC.nrmac[module_id]->temp_nrofDownlinkSymbols, RC.nrmac[module_id]->temp_nrofUplinkSymbols, RC.nrmac[module_id]->temp_dl_UL_TransmissionPeriodicity,
+                symb_ulMixed, nr_mix_slots, nr_slots_period);
 
   const struct NR_PUCCH_Config__resourceToAddModList *resList = ubwp->bwp_Dedicated->pucch_Config->choice.setup->resourceToAddModList;
   // for the moment, just block any symbol that might hold a PUCCH, regardless
@@ -165,14 +173,16 @@ void calculate_preferred_ul_tda(module_id_t module_id, const NR_BWP_Uplink_t *ub
   for (int slot = 0; slot < n; ++slot) {
     const int sched_slot = (slot + k2) % n;
     nrmac->preferred_ul_tda[bwp_id][slot] = -1;
-    if (frame_type == FDD || sched_slot % nr_slots_period >= tdd->nrofDownlinkSlots + nr_mix_slots)
+    int use_nrofDownlinkSlots = tdd ? tdd->nrofDownlinkSlots : RC.nrmac[module_id]->temp_nrofDownlinkSlots;
+    if (frame_type == FDD || sched_slot % nr_slots_period >= use_nrofDownlinkSlots + nr_mix_slots)
       nrmac->preferred_ul_tda[bwp_id][slot] = 0;
-    else if (nr_mix_slots && sched_slot % nr_slots_period == tdd->nrofDownlinkSlots)
+    else if (nr_mix_slots && sched_slot % nr_slots_period == use_nrofDownlinkSlots)
       nrmac->preferred_ul_tda[bwp_id][slot] = tdaMi;
     LOG_D(MAC, "DL slot %d UL slot %d preferred_ul_tda %d\n", slot, sched_slot, nrmac->preferred_ul_tda[bwp_id][slot]);
   }
 
-  if (tdd && k2 < tdd->nrofUplinkSlots) {
+  int use_nrofUplinkSlots = tdd ? tdd->nrofUplinkSlots : RC.nrmac[module_id]->temp_nrofUplinkSlots;
+  if (tdd && k2 < use_nrofUplinkSlots) {
     LOG_W(NR_MAC,
           "k2 %d < tdd->nrofUplinkSlots %ld: not all UL slots can be scheduled\n",
           k2,
@@ -914,14 +924,18 @@ bool nr_UE_is_to_be_scheduled(module_id_t mod_id, int CC_id, int UE_id, frame_t 
   const NR_UE_sched_ctrl_t *sched_ctrl = &nrmac->UE_info.UE_sched_ctrl[UE_id];
   const int last_ul_sched = sched_ctrl->last_ul_frame * n + sched_ctrl->last_ul_slot;
 
-  const NR_TDD_UL_DL_Pattern_t *tdd =
-      scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
+  const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon == NULL ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
   int num_slots_per_period;
   int tdd_period_len[8] = {500,625,1000,1250,2000,2500,5000,10000};
   if (tdd)
     num_slots_per_period = n*tdd_period_len[tdd->dl_UL_TransmissionPeriodicity]/10000;
   else
-    num_slots_per_period = n;
+    num_slots_per_period = n/get_nb_periods_per_frame(nrmac->temp_dl_UL_TransmissionPeriodicity); // num_slots_per_period = 10
+  LOG_D(NR_MAC, "%s(), nrofDownlinkSlots %d, nrofUplinkSlots %d, nrofDownlinkSymbols %d, nrofUplinkSymbols %d, period %d, "
+                "num_slots_per_period %d\n",
+                __func__, RC.nrmac[mod_id]->temp_nrofDownlinkSlots, RC.nrmac[mod_id]->temp_nrofUplinkSlots,
+                RC.nrmac[mod_id]->temp_nrofDownlinkSymbols, RC.nrmac[mod_id]->temp_nrofUplinkSymbols, RC.nrmac[mod_id]->temp_dl_UL_TransmissionPeriodicity,
+                num_slots_per_period);
 
   const int diff = (now - last_ul_sched + 1024 * n) % (1024 * n);
   /* UE is to be scheduled if
@@ -1486,13 +1500,22 @@ bool nr_fr1_ulsch_preprocessor(module_id_t module_id, frame_t frame, sub_frame_t
     return false;
 
   bool is_mixed_slot = false;
-  const NR_TDD_UL_DL_Pattern_t *tdd =
-      scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
+  const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon == NULL ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
 
-  if (tdd)
+  if (tdd || nr_mac->common_channels->frame_type != FDD) {
     is_mixed_slot = is_xlsch_in_slot(nr_mac->dlsch_slot_bitmap[sched_slot / 64], sched_slot) &&
                     is_xlsch_in_slot(nr_mac->ulsch_slot_bitmap[sched_slot / 64], sched_slot);
-
+    LOG_D(NR_MAC,
+          "%s(), frame %d slot %d, nrofDownlinkSlots %d, nrofUplinkSlots %d, nrofDownlinkSymbols %d, nrofUplinkSymbols %d, period %d, "
+          "is_mixed_slot %d, sched_frame %d, sched_slot %d, K2 %d\n",
+          __func__, frame, slot,
+          RC.nrmac[module_id]->temp_nrofDownlinkSlots, RC.nrmac[module_id]->temp_nrofUplinkSlots,
+          RC.nrmac[module_id]->temp_nrofDownlinkSymbols, RC.nrmac[module_id]->temp_nrofUplinkSymbols,
+          RC.nrmac[module_id]->temp_dl_UL_TransmissionPeriodicity,
+          is_mixed_slot, sched_frame, sched_slot, K2);
+    if (is_mixed_slot && frame == 100)
+      LOG_W(NR_MAC, "%d.%d, %s(), sched_slot %d is mix slot\n", frame, slot, __func__, sched_slot);
+  }
   // FIXME: Avoid mixed slots for initialUplinkBWP
   if (sched_ctrl->active_ubwp==NULL && is_mixed_slot)
     return false;

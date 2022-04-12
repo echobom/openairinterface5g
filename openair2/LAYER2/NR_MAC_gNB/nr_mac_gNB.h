@@ -820,6 +820,13 @@ typedef struct gNB_MAC_INST_s {
   double dl_bler_target_lower;
   double dl_rd2_bler_threshold;
   uint8_t dl_max_mcs;
+
+  int temp_nrofDownlinkSymbols;
+  int temp_nrofUplinkSymbols;
+  int temp_dl_UL_TransmissionPeriodicity;
+  int temp_nrofDownlinkSlots;
+  int temp_nrofUplinkSlots;
+  int temp_nrofMixSlots;
 } gNB_MAC_INST;
 
 #endif /*__LAYER2_NR_MAC_GNB_H__ */

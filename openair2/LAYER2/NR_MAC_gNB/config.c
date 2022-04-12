@@ -432,12 +432,17 @@ void config_common(int Mod_idP, int ssb_SubcarrierOffset, rrc_pdsch_AntennaPorts
       cfg->tdd_table.tdd_period.value = *scc->tdd_UL_DL_ConfigurationCommon->pattern1.ext1->dl_UL_TransmissionPeriodicity_v1530;
     }
     LOG_I(NR_MAC, "Setting TDD configuration period to %d\n", cfg->tdd_table.tdd_period.value);
-    int periods_per_frame = set_tdd_config_nr(cfg,
-                                              scc->uplinkConfigCommon->frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing,
-                                              scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSlots,
-                                              scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSymbols,
-                                              scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSlots,
-                                              scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSymbols);
+    LOG_I(NR_MAC,
+          "%s(), nrofDownlinkSlots %d, nrofUplinkSlots %d, nrofDownlinkSymbols %d, nrofUplinkSymbols %d\n",
+          __func__, RC.nrmac[Mod_idP]->temp_nrofDownlinkSlots, RC.nrmac[Mod_idP]->temp_nrofUplinkSlots,
+          RC.nrmac[Mod_idP]->temp_nrofDownlinkSymbols, RC.nrmac[Mod_idP]->temp_nrofUplinkSymbols);
+    int periods_per_frame = set_dyntdd_config_nr(cfg,
+                                                scc->uplinkConfigCommon->frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing,
+                                                RC.nrmac[Mod_idP]->temp_nrofDownlinkSlots,
+                                                RC.nrmac[Mod_idP]->temp_nrofDownlinkSymbols,
+                                                RC.nrmac[Mod_idP]->temp_nrofUplinkSlots,
+                                                RC.nrmac[Mod_idP]->temp_nrofUplinkSymbols,
+                                                RC.nrmac[Mod_idP]->temp_nrofMixSlots);
 
     if (periods_per_frame < 0)
       LOG_E(NR_MAC,"TDD configuration can not be done\n");
@@ -516,19 +521,36 @@ int rrc_mac_config_req_gNB(module_id_t Mod_idP,
 
     find_SSB_and_RO_available(Mod_idP);
 
-    const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
+    const NR_TDD_UL_DL_Pattern_t *tdd = NULL; // &scc->tdd_UL_DL_ConfigurationCommon->pattern1;
 
     int nr_slots_period = n;
     int nr_dl_slots = n;
     int nr_ulstart_slot = 0;
+    int nb_dl_slot = 0;
+    int nb_mix_slot = 1;
     if (tdd) {
       nr_dl_slots = tdd->nrofDownlinkSlots + (tdd->nrofDownlinkSymbols != 0);
       nr_ulstart_slot = tdd->nrofDownlinkSlots + (tdd->nrofUplinkSymbols == 0);
-      nr_slots_period /= get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
-    }
-    else
+      nr_slots_period = n / get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
+    } else {
       // if TDD configuration is not present and the band is not FDD, it means it is a dynamic TDD configuration
-      AssertFatal(RC.nrmac[Mod_idP]->common_channels[0].frame_type == FDD,"Dynamic TDD not handled yet\n");
+      // AssertFatal(RC.nrmac[Mod_idP]->common_channels[0].frame_type == FDD, "Dynamic TDD not handled yet\n");
+      nr_dl_slots = RC.nrmac[Mod_idP]->temp_nrofDownlinkSlots + (RC.nrmac[Mod_idP]->temp_nrofDownlinkSymbols != 0);
+      nr_ulstart_slot = RC.nrmac[Mod_idP]->temp_nrofDownlinkSlots + (RC.nrmac[Mod_idP]->temp_nrofUplinkSymbols == 0);
+      nr_slots_period = n / get_nb_periods_per_frame(RC.nrmac[Mod_idP]->temp_dl_UL_TransmissionPeriodicity);
+
+      nb_mix_slot = RC.nrmac[Mod_idP]->temp_nrofMixSlots;
+      nb_dl_slot = nr_slots_period - RC.nrmac[Mod_idP]->temp_nrofUplinkSlots - nb_mix_slot;
+      if (nb_mix_slot > 1) {
+        nr_ulstart_slot = nb_dl_slot + (RC.nrmac[Mod_idP]->temp_nrofUplinkSymbols == 0);
+      }
+    }
+    LOG_I(NR_MAC,
+          "%s(), nrofDownlinkSlots %d, nrofUplinkSlots %d, nrofDownlinkSymbols %d, nrofUplinkSymbols %d, period %d, "
+          "nr_dl_slots %d, nr_ulstart_slot %d, nr_slots_period %d\n",
+          __func__, RC.nrmac[Mod_idP]->temp_nrofDownlinkSlots, RC.nrmac[Mod_idP]->temp_nrofUplinkSlots,
+          RC.nrmac[Mod_idP]->temp_nrofDownlinkSymbols, RC.nrmac[Mod_idP]->temp_nrofUplinkSymbols, RC.nrmac[Mod_idP]->temp_dl_UL_TransmissionPeriodicity,
+          nr_dl_slots, nr_ulstart_slot, nr_slots_period);
 
     for (int slot = 0; slot < n; ++slot) {
       /* FIXME: it seems there is a problem with slot 0/10/slots right after UL:

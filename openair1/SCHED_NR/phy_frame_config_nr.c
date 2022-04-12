@@ -50,6 +50,125 @@
 *
 *********************************************************************/
 
+int set_dyntdd_config_nr(nfapi_nr_config_request_scf_t *cfg,
+                         int mu,
+                         int nrofDownlinkSlots,
+                         int nrofDownlinkSymbols,
+                         int nrofUplinkSlots,
+                         int nrofUplinkSymbols,
+                         int nrofMixslots) {
+  int slot_number = 0;
+  int nb_periods_per_frame;
+  int nb_slots_to_set = TDD_CONFIG_NB_FRAMES*(1<<mu)*NR_NUMBER_OF_SUBFRAMES_PER_FRAME;
+
+  switch(cfg->tdd_table.tdd_period.value) {
+    case 0:
+      nb_periods_per_frame = 20; // 10ms/0p5ms
+      break;
+
+    case 1:
+      nb_periods_per_frame = 16; // 10ms/0p625ms
+      break;
+
+    case 2:
+      nb_periods_per_frame = 10; // 10ms/1ms
+      break;
+
+    case 3:
+      nb_periods_per_frame = 8; // 10ms/1p25ms
+      break;
+
+    case 4:
+      nb_periods_per_frame = 5; // 10ms/2ms
+      break;
+
+    case 5:
+      nb_periods_per_frame = 4; // 10ms/2p5ms
+      break;
+
+    case 6:
+      nb_periods_per_frame = 2; // 10ms/5ms
+      break;
+
+    case 7:
+      nb_periods_per_frame = 1; // 10ms/10ms
+      break;
+
+    default:
+      AssertFatal(1==0,"Undefined tdd period %d\n", cfg->tdd_table.tdd_period.value);
+  }
+
+  int nb_slots_per_period = ((1<<mu) * NR_NUMBER_OF_SUBFRAMES_PER_FRAME)/nb_periods_per_frame;
+
+  if ( (nrofDownlinkSymbols + nrofUplinkSymbols) == 0 )
+    AssertFatal(nb_slots_per_period == (nrofDownlinkSlots + nrofUplinkSlots),
+                "set_tdd_configuration_nr: given period is inconsistent with current tdd configuration, nrofDownlinkSlots %d, nrofUplinkSlots %d, nb_slots_per_period %d \n",
+                nrofDownlinkSlots,nrofUplinkSlots,nb_slots_per_period);
+  else {
+    AssertFatal(nrofDownlinkSymbols + nrofUplinkSymbols < 14,"illegal symbol configuration DL %d, UL %d\n",nrofDownlinkSymbols,nrofUplinkSymbols);
+    AssertFatal(nb_slots_per_period == (nrofDownlinkSlots + nrofUplinkSlots + 1),
+                "set_tdd_configuration_nr: given period is inconsistent with current tdd configuration, nrofDownlinkSlots %d, nrofUplinkSlots %d, nrofMixed slots 1, nb_slots_per_period %d \n",
+                nrofDownlinkSlots,nrofUplinkSlots,nb_slots_per_period);
+  }
+
+  cfg->tdd_table.max_tdd_periodicity_list = (nfapi_nr_max_tdd_periodicity_t *) malloc(nb_slots_to_set*sizeof(nfapi_nr_max_tdd_periodicity_t));
+
+  for(int memory_alloc =0 ; memory_alloc<nb_slots_to_set; memory_alloc++)
+    cfg->tdd_table.max_tdd_periodicity_list[memory_alloc].max_num_of_symbol_per_slot_list = (nfapi_nr_max_num_of_symbol_per_slot_t *) malloc(NR_NUMBER_OF_SYMBOLS_PER_SLOT*sizeof(
+            nfapi_nr_max_num_of_symbol_per_slot_t));
+
+  if (nrofMixslots > 1)
+    nrofDownlinkSlots = nb_slots_per_period - nrofUplinkSlots - nrofMixslots;
+  int temp_tdd_table[nb_slots_to_set];
+  while(slot_number != nb_slots_to_set) {
+    if(nrofDownlinkSlots != 0) {
+      for (int number_of_symbol = 0; number_of_symbol < nrofDownlinkSlots*NR_NUMBER_OF_SYMBOLS_PER_SLOT; number_of_symbol++) {
+        cfg->tdd_table.max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol%NR_NUMBER_OF_SYMBOLS_PER_SLOT].slot_config.value= 0;
+        temp_tdd_table[slot_number] = 0;
+        if((number_of_symbol+1)%NR_NUMBER_OF_SYMBOLS_PER_SLOT == 0)
+          slot_number++;
+      }
+    }
+
+    for (int mix_i = 0; mix_i < nrofMixslots; mix_i++) {
+      if (nrofDownlinkSymbols != 0 || nrofUplinkSymbols != 0) {
+        temp_tdd_table[slot_number] = 2;
+        for (int number_of_symbol = 0; number_of_symbol < nrofDownlinkSymbols; number_of_symbol++) {
+          cfg->tdd_table.max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol].slot_config.value = 0;
+        }
+
+        for (int number_of_symbol = nrofDownlinkSymbols;
+             number_of_symbol < NR_NUMBER_OF_SYMBOLS_PER_SLOT - nrofUplinkSymbols; number_of_symbol++) {
+          cfg->tdd_table.max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol].slot_config.value = 2;
+        }
+
+        for (int number_of_symbol = NR_NUMBER_OF_SYMBOLS_PER_SLOT - nrofUplinkSymbols;
+             number_of_symbol < NR_NUMBER_OF_SYMBOLS_PER_SLOT; number_of_symbol++) {
+          cfg->tdd_table.max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol].slot_config.value = 1;
+        }
+
+        slot_number++;
+      }
+    }
+
+    if(nrofUplinkSlots != 0) {
+      for (int number_of_symbol = 0; number_of_symbol < nrofUplinkSlots*NR_NUMBER_OF_SYMBOLS_PER_SLOT; number_of_symbol++) {
+        cfg->tdd_table.max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol%NR_NUMBER_OF_SYMBOLS_PER_SLOT].slot_config.value= 1;
+        temp_tdd_table[slot_number] = 1;
+        if((number_of_symbol+1)%NR_NUMBER_OF_SYMBOLS_PER_SLOT == 0)
+          slot_number++;
+      }
+    }
+  }
+
+  LOG_I(NR_PHY, "%s(), tdd_table = ", __func__);
+  for (int i = 0; i < 10; i++)
+    printf("%d", temp_tdd_table[i]);
+  printf("\n");
+
+  return (nb_periods_per_frame);
+}
+
 int set_tdd_config_nr( nfapi_nr_config_request_scf_t *cfg,
                        int mu,
                        int nrofDownlinkSlots, int nrofDownlinkSymbols,

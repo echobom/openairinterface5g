@@ -173,6 +173,13 @@ void mac_top_init_gNB(void)
 
       RC.nrmac[i]->first_MIB = true;
 
+      RC.nrmac[i]->temp_nrofDownlinkSymbols = 6;
+      RC.nrmac[i]->temp_nrofUplinkSymbols = 4;
+      RC.nrmac[i]->temp_dl_UL_TransmissionPeriodicity = 6;
+      RC.nrmac[i]->temp_nrofDownlinkSlots = 8;
+      RC.nrmac[i]->temp_nrofUplinkSlots = 1;
+      RC.nrmac[i]->temp_nrofMixSlots = 2;
+
       if (get_softmodem_params()->phy_test) {
         RC.nrmac[i]->pre_processor_dl = nr_preprocessor_phytest;
         RC.nrmac[i]->pre_processor_ul = nr_ul_preprocessor_phytest;

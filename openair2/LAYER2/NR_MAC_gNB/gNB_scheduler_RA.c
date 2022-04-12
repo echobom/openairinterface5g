@@ -411,7 +411,7 @@ void nr_schedule_msg2(uint16_t rach_frame, uint16_t rach_slot,
   uint8_t response_window = scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->rach_ConfigGeneric.ra_ResponseWindow;
   uint8_t slot_window;
   const int n_slots_frame = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
-  const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
+  const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon == NULL ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
   // number of mixed slot or of last dl slot if there is no mixed slot
   uint8_t last_dl_slot_period = n_slots_frame-1;
   // lenght of tdd period in slots
@@ -422,9 +422,17 @@ void nr_schedule_msg2(uint16_t rach_frame, uint16_t rach_slot,
     tdd_period_slot = n_slots_frame/get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
   }
   else{
-    if(frame_type == TDD)
-      AssertFatal(frame_type == FDD, "Dynamic TDD not handled yet\n");
+    if(frame_type == TDD) {
+      // AssertFatal(frame_type == FDD, "Dynamic TDD not handled yet\n");
+      last_dl_slot_period = RC.nrmac[0]->temp_nrofDownlinkSymbols == 0? (RC.nrmac[0]->temp_nrofDownlinkSlots-1) : RC.nrmac[0]->temp_nrofDownlinkSlots;
+      tdd_period_slot = n_slots_frame/get_nb_periods_per_frame(6);
+    }
   }
+  LOG_I(NR_MAC, "%s(), nrofDownlinkSlots %d, nrofUplinkSlots %d, nrofDownlinkSymbols %d, nrofUplinkSymbols %d, period %d, "
+                "n_slots_frame %d, last_dl_slot_period %d, tdd_period_slot %d\n",
+                __func__, RC.nrmac[0]->temp_nrofDownlinkSlots, RC.nrmac[0]->temp_nrofUplinkSlots,
+                RC.nrmac[0]->temp_nrofDownlinkSymbols, RC.nrmac[0]->temp_nrofUplinkSymbols, RC.nrmac[0]->temp_dl_UL_TransmissionPeriodicity,
+                n_slots_frame, last_dl_slot_period, tdd_period_slot);
 
 
   switch(response_window){
@@ -517,6 +525,11 @@ void nr_initiate_ra_proc(module_id_t module_idP,
                          uint8_t freq_index,
                          uint8_t symbol,
                          int16_t timing_offset){
+
+  LOG_I(NR_MAC, "%s(), frame %d slot %d, nrofDownlinkSlots %d, nrofUplinkSlots %d, nrofDownlinkSymbols %d, nrofUplinkSymbols %d, period %d\n",
+                __func__, frameP, slotP,
+                RC.nrmac[module_idP]->temp_nrofDownlinkSlots, RC.nrmac[module_idP]->temp_nrofUplinkSlots,
+                RC.nrmac[module_idP]->temp_nrofDownlinkSymbols, RC.nrmac[module_idP]->temp_nrofUplinkSymbols, RC.nrmac[module_idP]->temp_dl_UL_TransmissionPeriodicity);
 
   uint8_t ul_carrier_id = 0; // 0 for NUL 1 for SUL
   NR_SearchSpace_t *ss;
@@ -760,9 +773,10 @@ void nr_generate_Msg3_retransmission(module_id_t module_idP, int CC_id, frame_t 
     if (*scc->downlinkConfigCommon->frequencyInfoDL->frequencyBandList.list.array[0] >= 257) {
       // FR2
       const int n_slots_frame = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
-      const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
+      const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon == NULL ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
       AssertFatal(tdd,"Dynamic TDD not handled yet\n");
-      uint8_t tdd_period_slot = n_slots_frame/get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
+      uint8_t tdd_period_slot = tdd ? n_slots_frame/get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity) :
+                                      n_slots_frame/get_nb_periods_per_frame(RC.nrmac[module_idP]->temp_dl_UL_TransmissionPeriodicity);
       int num_tdd_period = sched_slot/tdd_period_slot;
 
       if((tdd_beam_association[num_tdd_period]!=-1)&&(tdd_beam_association[num_tdd_period]!=ra->beam_id))
@@ -948,24 +962,37 @@ void nr_get_Msg3alloc(module_id_t module_id,
     ubwp->bwp_Common->pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList:
     scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList;
 
-  const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
+  const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon == NULL ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
   const int n_slots_frame = nr_slots_per_frame[mu];
   uint8_t k2 = 0;
   if (frame_type == TDD) {
-    int nb_periods_per_frame = get_nb_periods_per_frame(scc->tdd_UL_DL_ConfigurationCommon->pattern1.dl_UL_TransmissionPeriodicity);
+    // nb_periods_per_frame = 2, nb_slots_per_period = 10, n_slots_frame = 20, (1<<mu)*10) = 20
+    int nb_periods_per_frame = tdd ? get_nb_periods_per_frame(scc->tdd_UL_DL_ConfigurationCommon->pattern1.dl_UL_TransmissionPeriodicity) :
+                                        get_nb_periods_per_frame(RC.nrmac[module_id]->temp_dl_UL_TransmissionPeriodicity);
     int nb_slots_per_period = ((1<<mu)*10)/nb_periods_per_frame;
+    LOG_I(NR_MAC, "%s(), nrofDownlinkSlots %d, nrofUplinkSlots %d, nrofDownlinkSymbols %d, nrofUplinkSymbols %d, period %d, "
+                  "n_slots_frame %d, nb_periods_per_frame %d, nb_slots_per_period %d\n",
+                  __func__, RC.nrmac[module_id]->temp_nrofDownlinkSlots, RC.nrmac[module_id]->temp_nrofUplinkSlots,
+                  RC.nrmac[module_id]->temp_nrofDownlinkSymbols, RC.nrmac[module_id]->temp_nrofUplinkSymbols, RC.nrmac[module_id]->temp_dl_UL_TransmissionPeriodicity,
+                  n_slots_frame, nb_periods_per_frame, nb_slots_per_period);
     for (int i=0; i<pusch_TimeDomainAllocationList->list.count; i++) {
       startSymbolAndLength = pusch_TimeDomainAllocationList->list.array[i]->startSymbolAndLength;
       SLIV2SL(startSymbolAndLength, &StartSymbolIndex, &NrOfSymbols);
-      k2 = *pusch_TimeDomainAllocationList->list.array[i]->k2;
+      k2 = *pusch_TimeDomainAllocationList->list.array[i]->k2; // k2 = 7
+      LOG_W(NR_MAC, "%s(), k2 %d, DELTA[%d] %d, nb_slots_per_period %d\n",
+            __func__, k2, mu, DELTA[mu], nb_slots_per_period);
       // we want to transmit in the uplink symbols of mixed slot
       if ((k2 + DELTA[mu])%nb_slots_per_period == 0) {
         temp_slot = current_slot + k2 + DELTA[mu]; // msg3 slot according to 8.3 in 38.213
         ra->Msg3_slot = temp_slot%nr_slots_per_frame[mu];
+        LOG_W(NR_MAC, "%s(), ra->Msg3_slot %d\n",
+              __func__, ra->Msg3_slot);
         if (is_xlsch_in_slot(RC.nrmac[module_id]->ulsch_slot_bitmap[ra->Msg3_slot / 64], ra->Msg3_slot)) {
           ra->Msg3_tda_id = i;
           ra->msg3_startsymb = StartSymbolIndex;
           ra->msg3_nrsymb = NrOfSymbols;
+          LOG_W(NR_MAC, "%s(), Msg3_tda_id %d, msg3_startsymb %d, msg3_nrsymb %d\n",
+                __func__, ra->Msg3_tda_id, ra->msg3_startsymb, ra->msg3_nrsymb);
           break;
         }
       }
@@ -988,7 +1015,7 @@ void nr_get_Msg3alloc(module_id_t module_id,
   // beam association for FR2
   if (*scc->downlinkConfigCommon->frequencyInfoDL->frequencyBandList.list.array[0] >= 257) {
     AssertFatal(tdd,"Dynamic TDD not handled yet\n");
-    uint8_t tdd_period_slot = n_slots_frame/get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
+    uint8_t tdd_period_slot = tdd ? n_slots_frame/get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity) : n_slots_frame;
     int num_tdd_period = ra->Msg3_slot/tdd_period_slot;
     if((tdd_beam_association[num_tdd_period]!=-1)&&(tdd_beam_association[num_tdd_period]!=ra->beam_id))
       AssertFatal(1==0,"Cannot schedule MSG3\n");
@@ -996,7 +1023,7 @@ void nr_get_Msg3alloc(module_id_t module_id,
       tdd_beam_association[num_tdd_period] = ra->beam_id;
   }
 
-  LOG_D(NR_MAC, "[RAPROC] Msg3 slot %d: current slot %u Msg3 frame %u k2 %u Msg3_tda_id %u\n", ra->Msg3_slot, current_slot, ra->Msg3_frame, k2,ra->Msg3_tda_id);
+  LOG_W(NR_MAC, "[RAPROC] Msg3 slot %d: current slot %u Msg3 frame %u k2 %u Msg3_tda_id %u\n", ra->Msg3_slot, current_slot, ra->Msg3_frame, k2,ra->Msg3_tda_id);
   uint16_t *vrb_map_UL =
       &RC.nrmac[module_id]->common_channels[CC_id].vrb_map_UL[ra->Msg3_slot * MAX_BWP_SIZE];
 

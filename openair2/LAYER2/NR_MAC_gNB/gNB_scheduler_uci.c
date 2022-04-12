@@ -1322,7 +1322,7 @@ void extract_pucch_csi_report(NR_CSI_MeasConfig_t *csi_MeasConfig,
     // verify if report with current id has been scheduled for this frame and slot
     if ((n_slots_frame*frame + slot - offset)%period == 0) {
       reportQuantity_type = csi_report->reportQuantity_type;
-      LOG_D(MAC,"SFN/SF:%d/%d reportQuantity type = %d\n",frame,slot,reportQuantity_type);
+      LOG_I(MAC,"SFN/SF:%d/%d reportQuantity type = %d\n",frame,slot,reportQuantity_type);
       switch(reportQuantity_type){
         case NR_CSI_ReportConfig__reportQuantity_PR_cri_RSRP:
           evaluate_rsrp_report(UE_info,sched_ctrl,UE_id,csi_report_id,payload,&cumul_bits,reportQuantity_type);
@@ -1595,19 +1595,29 @@ int nr_acknack_scheduling(int mod_id,
   const int minfbtime = RC.nrmac[mod_id]->minRXTXTIMEpdsch;
   const NR_ServingCellConfigCommon_t *scc = RC.nrmac[mod_id]->common_channels[CC_id].ServingCellConfigCommon;
   const int n_slots_frame = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
-  const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
+  const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon == NULL ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
   // initializing the values for FDD
   int nr_slots_period = n_slots_frame;
   int first_ul_slot_tdd = slot + minfbtime;
   int first_ul_slot_period = 0;
-  if(tdd){
-    nr_slots_period /= get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
+  if (tdd) {
+    nr_slots_period = n_slots_frame / get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
     first_ul_slot_tdd = tdd->nrofDownlinkSlots + nr_slots_period * (slot / nr_slots_period);
     first_ul_slot_period = tdd->nrofDownlinkSlots;
-  }
-  else
+  } else {
     // if TDD configuration is not present and the band is not FDD, it means it is a dynamic TDD configuration
-    AssertFatal(RC.nrmac[mod_id]->common_channels[CC_id].frame_type == FDD,"Dynamic TDD not handled yet\n");
+    // AssertFatal(RC.nrmac[mod_id]->common_channels[CC_id].frame_type == FDD,"Dynamic TDD not handled yet\n");
+    nr_slots_period = n_slots_frame / get_nb_periods_per_frame(RC.nrmac[mod_id]->temp_dl_UL_TransmissionPeriodicity);
+    first_ul_slot_tdd = RC.nrmac[mod_id]->temp_nrofDownlinkSlots + nr_slots_period * (slot / nr_slots_period);
+    first_ul_slot_period = RC.nrmac[mod_id]->temp_nrofDownlinkSlots;
+  }
+  LOG_D(NR_MAC,
+        "%s(), frame %d slot %d, nrofDownlinkSlots %d, nrofUplinkSlots %d, nrofDownlinkSymbols %d, nrofUplinkSymbols %d, period %d, "
+        "nr_slots_period %d, first_ul_slot_tdd %d, first_ul_slot_period %d\n",
+        __func__, frame, slot,
+        RC.nrmac[mod_id]->temp_nrofDownlinkSlots, RC.nrmac[mod_id]->temp_nrofUplinkSlots,
+        RC.nrmac[mod_id]->temp_nrofDownlinkSymbols, RC.nrmac[mod_id]->temp_nrofUplinkSymbols, RC.nrmac[mod_id]->temp_dl_UL_TransmissionPeriodicity,
+        nr_slots_period, first_ul_slot_tdd, first_ul_slot_period);
 
   NR_sched_pucch_t *csi_pucch;
 
