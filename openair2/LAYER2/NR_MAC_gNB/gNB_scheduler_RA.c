@@ -1981,12 +1981,12 @@ void nr_check_Msg4_Ack(module_id_t module_id, int CC_id, frame_t frame, sub_fram
 
         const struct NR_ServingCellConfig__downlinkBWP_ToAddModList *bwpList = servingCellConfig ? servingCellConfig->downlinkBWP_ToAddModList : NULL;
         const int bwp_id = servingCellConfig && servingCellConfig->firstActiveDownlinkBWP_Id ?
-            *servingCellConfig->firstActiveDownlinkBWP_Id : 0;
+                           *servingCellConfig->firstActiveDownlinkBWP_Id : 0;
         sched_ctrl->active_bwp = bwpList && bwp_id > 0 ? bwpList->list.array[bwp_id - 1] : NULL;
 
         const struct NR_UplinkConfig__uplinkBWP_ToAddModList *ubwpList = servingCellConfig ? servingCellConfig->uplinkConfig->uplinkBWP_ToAddModList : NULL;
         const int ubwp_id = servingCellConfig && servingCellConfig->uplinkConfig && servingCellConfig->uplinkConfig->firstActiveUplinkBWP_Id ?
-            *servingCellConfig->uplinkConfig->firstActiveUplinkBWP_Id : 0;
+                            *servingCellConfig->uplinkConfig->firstActiveUplinkBWP_Id : 0;
         sched_ctrl->active_ubwp = ubwpList && ubwp_id > 0 ? ubwpList->list.array[ubwp_id - 1] : NULL;
 
         if(sched_ctrl->active_bwp) {
@@ -1997,10 +1997,12 @@ void nr_check_Msg4_Ack(module_id_t module_id, int CC_id, frame_t frame, sub_fram
           LOG_I(NR_MAC, "Changing to UL-BWP %i\n", ubwp_id);
         }
 
-        // Pause scheduling according to:
+        const NR_SIB1_t *sib1 = RC.nrmac[module_id]->common_channels[0].sib1 ? RC.nrmac[module_id]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL;
+        NR_BWP_t *genericParameters = get_dl_bwp_genericParameters(sched_ctrl->active_bwp,
+                                                                   RC.nrmac[module_id]->common_channels[0].ServingCellConfigCommon,
+                                                                   sib1);
         // 3GPP TS 38.331 Section 12 Table 12.1-1: UE performance requirements for RRC procedures for UEs
-        sched_ctrl->schedule_enabled = false;
-        nr_mac_gNB_enable_rrc_processing_timer_req(module_id, ra->rnti);
+        sched_ctrl->rrc_processing_timer = (10 << genericParameters->subcarrierSpacing); // RRCSetup 10 ms
       }
       else {
         LOG_D(NR_MAC, "(ue %i, rnti 0x%04x) RA Procedure failed at Msg4!\n", UE_id, ra->rnti);
