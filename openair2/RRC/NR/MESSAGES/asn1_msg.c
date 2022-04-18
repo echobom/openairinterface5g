@@ -2368,15 +2368,15 @@ void fill_mastercellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig, NR_CellGr
   ASN_SEQUENCE_ADD(&ue_context_mastercellGroup->rlc_BearerToAddModList->list, rlc_BearerConfig_drb);
 }
 
+
 void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
-                            rrc_gNB_carrier_data_t *carrier,
                             NR_UE_NR_Capability_t *uecap,
-                            const gNB_RrcConfigurationReq* configuration)
-{
+                            const gNB_RrcConfigurationReq* configuration) {
+
   NR_SpCellConfig_t *SpCellConfig = cellGroupConfig->spCellConfig;
   if (SpCellConfig == NULL) return;
 
-  NR_ServingCellConfigCommon_t *scc = carrier ? carrier->servingcellconfigcommon : NULL;
+  NR_ServingCellConfigCommon_t *scc = configuration->scc;
 
   // Set DL MCS table
   if(scc) {
@@ -2600,7 +2600,7 @@ int16_t do_RRCSetup(rrc_gNB_ue_context_t          *const ue_context_pP,
 				     NULL,
 				     (void *)&dl_ccch_msg,
 				     buffer,
-				     1000);
+				     3000);
 
     if(enc_rval.encoded == -1) {
       LOG_E(NR_RRC, "[gNB AssertFatal]ASN1 message encoding failed (%s, %lu)!\n",
@@ -2872,9 +2872,9 @@ int16_t do_RRCReconfiguration(
 
     if(cellGroupConfig!=NULL){
       update_cellGroupConfig(cellGroupConfig,
-                             carrier,
                              ue_context_pP ? ue_context_pP->ue_context.UE_Capability_nr : NULL,
                              configuration);
+
       enc_rval = uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig,
           NULL,
           (void *)cellGroupConfig,
