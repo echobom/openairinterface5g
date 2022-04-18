@@ -1994,7 +1994,26 @@ int nr_rrc_reconfiguration_req(rrc_gNB_ue_context_t         *const ue_context_pP
                                          NULL,
                                          masterCellGroup);
 
-  enable_nr_rrc_processing_timer(ctxt_pP->module_id, ue_context_pP, TX_SL_AHEAD_DELAY + NR_RRC_PROCESSING_DELAY_MS + NR_RRC_BWP_SWITCH_DELAY_MS);
+  uint32_t delay_ms = NR_RRC_PROCESSING_DELAY_MS;
+  if (ue_context_pP->ue_context.masterCellGroup &&
+      ue_context_pP->ue_context.masterCellGroup->spCellConfig &&
+      ue_context_pP->ue_context.masterCellGroup->spCellConfig->spCellConfigDedicated &&
+      ue_context_pP->ue_context.masterCellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList) {
+    delay_ms += NR_RRC_BWP_SWITCH_DELAY_MS;
+  }
+  rrc_mac_config_req_gNB(ctxt_pP->module_id,
+                         0,
+                         RC.nrrrc[ctxt_pP->module_id]->configuration.pdsch_AntennaPorts,
+                         0,
+                         0,
+                         0,
+                         RC.nrrrc[ctxt_pP->module_id]->carrier.servingcellconfigcommon,
+                         NULL,
+                         NULL,
+                         0,
+                         ue_context_pP->ue_context.rnti,
+                         NULL,
+                         delay_ms);
 
   nr_rrc_data_req(ctxt_pP,
                   DCCH,
