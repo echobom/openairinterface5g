@@ -1607,7 +1607,7 @@ void fill_initial_SpCellConfig(int uid,
   // one symbol (13)
   NR_PUCCH_Resource_t *pucchres0=calloc(1,sizeof(*pucchres0));
   pucchres0->pucch_ResourceId=0;
-  pucchres0->startingPRB=(uid*12+8) % curr_bwp;
+  pucchres0->startingPRB=(uid+8) % curr_bwp;
   LOG_D(NR_RRC, "pucchres0->startPRB %ld uid %d curr_bwp %d\n", pucchres0->startingPRB, uid, curr_bwp);
   pucchres0->intraSlotFrequencyHopping=NULL;
   pucchres0->secondHopPRB=NULL;
@@ -1620,7 +1620,7 @@ void fill_initial_SpCellConfig(int uid,
 
   NR_PUCCH_Resource_t *pucchres2=calloc(1,sizeof(*pucchres2));
   pucchres2->pucch_ResourceId=1;
-  pucchres2->startingPRB=(uid*12) % curr_bwp;
+  pucchres2->startingPRB=0;
   pucchres2->intraSlotFrequencyHopping=NULL;
   pucchres2->secondHopPRB=NULL;
   pucchres2->format.present= NR_PUCCH_Resource__format_PR_format2;
@@ -1987,19 +1987,6 @@ void fill_initial_SpCellConfig(int uid,
 
     csi_MeasConfig->csi_IM_ResourceToReleaseList = NULL;
     csi_MeasConfig->csi_IM_ResourceSetToReleaseList = NULL;
-
-    csi_MeasConfig->nzp_CSI_RS_ResourceSetToAddModList  = calloc(1,sizeof(*csi_MeasConfig->nzp_CSI_RS_ResourceSetToAddModList));
-    NR_NZP_CSI_RS_ResourceSet_t *nzpcsirs0 = calloc(1,sizeof(*nzpcsirs0));
-    nzpcsirs0->nzp_CSI_ResourceSetId = 0;
-    NR_NZP_CSI_RS_ResourceId_t *nzpid0 = calloc(1,sizeof(*nzpid0));
-    *nzpid0 = 0;
-    ASN_SEQUENCE_ADD(&nzpcsirs0->nzp_CSI_RS_Resources,nzpid0);
-    nzpcsirs0->repetition = NULL;
-    nzpcsirs0->aperiodicTriggeringOffset = NULL;
-    nzpcsirs0->trs_Info = NULL;
-    ASN_SEQUENCE_ADD(&csi_MeasConfig->nzp_CSI_RS_ResourceSetToAddModList->list,nzpcsirs0);
-
-    csi_MeasConfig->nzp_CSI_RS_ResourceSetToReleaseList = NULL;
 
     config_csirs(scc, csi_MeasConfig, uid, pdsch_AntennaPorts, curr_bwp, configuration->do_CSIRS);
 
