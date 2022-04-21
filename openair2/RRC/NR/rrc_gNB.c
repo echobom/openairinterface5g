@@ -323,7 +323,8 @@ void apply_macrlc_config_reest(gNB_RRC_INST *rrc,
                              NULL,
                              0,
                              rnti,
-                             get_softmodem_params()->sa ? ue_context_pP->ue_context.masterCellGroup : (NR_CellGroupConfig_t *)NULL);
+                             get_softmodem_params()->sa ? ue_context_pP->ue_context.masterCellGroup : (NR_CellGroupConfig_t *)NULL,
+                             0);
 
       nr_rrc_rlc_config_asn1_req(ctxt_pP,
                                  ue_context_pP->ue_context.SRB_configList,
@@ -1061,7 +1062,8 @@ rrc_gNB_generate_dedicatedRRCReconfiguration(
 
   memset(buffer, 0, sizeof(buffer));
   cellGroupConfig = calloc(1, sizeof(NR_CellGroupConfig_t));
-  fill_mastercellGroupConfig(cellGroupConfig, ue_context_pP->ue_context.masterCellGroup,
+  fill_mastercellGroupConfig(cellGroupConfig,
+                             ue_context_pP->ue_context.masterCellGroup,
                              rrc->um_on_default_drb);
   size = do_RRCReconfiguration(ctxt_pP, buffer, sizeof(buffer),
                                 xid,
@@ -2034,7 +2036,9 @@ rrc_gNB_process_RRCConnectionReestablishmentComplete(
   memset(buffer, 0, sizeof(buffer));
 
   NR_CellGroupConfig_t *cellGroupConfig = calloc(1, sizeof(NR_CellGroupConfig_t));
-  fill_mastercellGroupConfig(cellGroupConfig, ue_context_pP->ue_context.masterCellGroup);
+  fill_mastercellGroupConfig(cellGroupConfig,
+                             ue_context_pP->ue_context.masterCellGroup,
+                             RC.nrrrc[ctxt_pP->module_id]->um_on_default_drb);
   for(i = 0; i < cellGroupConfig->rlc_BearerToAddModList->list.count; i++) {
     cellGroupConfig->rlc_BearerToAddModList->list.array[i]->reestablishRLC = CALLOC(1, sizeof(*cellGroupConfig->rlc_BearerToAddModList->list.array[i]->reestablishRLC));
     *cellGroupConfig->rlc_BearerToAddModList->list.array[i]->reestablishRLC = NR_RLC_BearerConfig__reestablishRLC_true;
@@ -3442,7 +3446,9 @@ static void rrc_DU_process_ue_context_setup_request(MessageDef *msg_p, const cha
 
   NR_CellGroupConfig_t *cellGroupConfig;
   cellGroupConfig = calloc(1, sizeof(NR_CellGroupConfig_t));
-  fill_mastercellGroupConfig(cellGroupConfig, ue_context_p->ue_context.masterCellGroup,rrc->um_on_default_drb);
+  fill_mastercellGroupConfig(cellGroupConfig,
+                             ue_context_p->ue_context.masterCellGroup,
+                             rrc->um_on_default_drb);
 
   /* Configure SRB2 */
   NR_SRB_ToAddMod_t            *SRB2_config          = NULL;

@@ -1687,14 +1687,14 @@ void nr_generate_Msg4(module_id_t module_idP, int CC_id, frame_t frameP, sub_fra
         if (mac_sdu_length < 256) {
           ((NR_MAC_SUBHEADER_SHORT *) &buf[mac_pdu_length])->R = 0;
           ((NR_MAC_SUBHEADER_SHORT *) &buf[mac_pdu_length])->F = 0;
-          ((NR_MAC_SUBHEADER_SHORT *) &buf[mac_pdu_length])->LCID = DL_SCH_LCID_CCCH;
+          ((NR_MAC_SUBHEADER_SHORT *) &buf[mac_pdu_length])->LCID = lcid;
           ((NR_MAC_SUBHEADER_SHORT *) &buf[mac_pdu_length])->L = mac_sdu_length;
           ra->mac_pdu_length = mac_pdu_length + mac_sdu_length + sizeof(NR_MAC_SUBHEADER_SHORT);
         } else {
           mac_subheader_len = sizeof(NR_MAC_SUBHEADER_LONG);
           ((NR_MAC_SUBHEADER_LONG *) &buf[mac_pdu_length])->R = 0;
           ((NR_MAC_SUBHEADER_LONG *) &buf[mac_pdu_length])->F = 1;
-          ((NR_MAC_SUBHEADER_LONG *) &buf[mac_pdu_length])->LCID = DL_SCH_LCID_CCCH;
+          ((NR_MAC_SUBHEADER_LONG *) &buf[mac_pdu_length])->LCID = lcid;
           ((NR_MAC_SUBHEADER_LONG *) &buf[mac_pdu_length])->L1 = (mac_sdu_length >> 8) & 0xff;
           ((NR_MAC_SUBHEADER_LONG *) &buf[mac_pdu_length])->L2 = mac_sdu_length & 0xff;
           ra->mac_pdu_length = mac_pdu_length + mac_sdu_length + sizeof(NR_MAC_SUBHEADER_LONG);
