@@ -1642,11 +1642,48 @@ void nr_generate_Msg4(module_id_t module_idP, int CC_id, frame_t frameP, sub_fra
         // Just send padding LCID
         ra->mac_pdu_length = 0;
       } else {
+        // UE Contention Resolution Identity MAC CE
         uint16_t mac_pdu_length = nr_write_ce_dlsch_pdu(module_idP, nr_mac->sched_ctrlCommon, buf, 255, ra->cont_res_id);
         LOG_D(NR_MAC,"Encoded contention resolution mac_pdu_length %d\n",mac_pdu_length);
+
+        // Checking Msg4 data (RRCSetup/RRCResume/RRCReestablishment)
         uint8_t buffer[CCCH_SDU_SIZE];
         uint8_t mac_subheader_len = sizeof(NR_MAC_SUBHEADER_SHORT);
         uint16_t mac_sdu_length = mac_rrc_nr_data_req(module_idP, CC_id, frameP, CCCH, ra->rnti, 1, buffer);
+        uint8_t lcid = DL_SCH_LCID_CCCH;
+        if (mac_sdu_length == 0) {
+          LOG_I(NR_MAC,"No Msg4, check DCCH message for RRCReestablishment 0x%x\n",ra->rnti);
+          sched_ctrl->rlc_status[DL_SCH_LCID_DCCH] = mac_rlc_status_ind(module_idP,
+                                                                        ra->rnti,
+                                                                        module_idP,
+                                                                        frameP,
+                                                                        slotP,
+                                                                        ENB_FLAG_YES,
+                                                                        MBMS_FLAG_NO,
+                                                                        DL_SCH_LCID_DCCH,
+                                                                        0,
+                                                                        0);
+          if (sched_ctrl->rlc_status[DL_SCH_LCID_DCCH].bytes_in_buffer > 0) {
+            mac_sdu_length = mac_rlc_data_req(module_idP,
+                                        ra->rnti,
+                                        module_idP,
+                                        frameP,
+                                        ENB_FLAG_YES,
+                                        MBMS_FLAG_NO,
+                                        DL_SCH_LCID_DCCH,
+                                        sched_ctrl->rlc_status[DL_SCH_LCID_DCCH].bytes_in_buffer,
+                                        (char *)&buf[mac_pdu_length + sizeof(NR_MAC_SUBHEADER_SHORT)],
+                                        0,
+                                        0);
+            lcid = DL_SCH_LCID_DCCH;
+          } else {
+            LOG_W(NR_MAC, "No Msg4, release ra proc. 0x%04x\n", ra->rnti);
+            mac_remove_nr_ue(module_idP, ra->rnti);
+            nr_clear_ra_proc(module_idP, CC_id, frameP, ra);
+            return;
+          }
+        }
+
         if (mac_sdu_length < 256) {
           ((NR_MAC_SUBHEADER_SHORT *) &buf[mac_pdu_length])->R = 0;
           ((NR_MAC_SUBHEADER_SHORT *) &buf[mac_pdu_length])->F = 0;

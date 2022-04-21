@@ -987,9 +987,9 @@ void *nas_nrue_task(void *args_p)
 	    if ((payload_container_length >= PAYLOAD_CONTAINER_LENGTH_MIN) &&
 		(payload_container_length <= PAYLOAD_CONTAINER_LENGTH_MAX))
 	      offset += (PLAIN_5GS_NAS_MESSAGE_HEADER_LENGTH + 3);
-	    if (offset < NAS_CONN_ESTABLI_CNF(msg_p).nasMsg.length) 
+	    if (offset < NAS_CONN_ESTABLI_CNF(msg_p).nasMsg.length)
 	      payload_container = pdu_buffer + offset;
-	    
+
 	    while(offset < payload_container_length) {
 	      if (*(payload_container + offset) == 0x29) { // PDU address IEI
 		if ((*(payload_container+offset+1) == 0x05) && (*(payload_container +offset+2) == 0x01)) { // IPV4

@@ -45,6 +45,7 @@
 #include "LAYER2/nr_rlc/nr_rlc_oai_api.h"
 #include "asn1_msg.h"
 #include "../nr_rrc_proto.h"
+#include "UTIL/OSA/osa_defs.h"
 #include "RRC/NR/nr_rrc_extern.h"
 #include "NR_DL-CCCH-Message.h"
 #include "NR_UL-CCCH-Message.h"
@@ -73,6 +74,8 @@
 #include "NR_RRCReconfigurationComplete-IEs.h"
 #include "NR_DLInformationTransfer.h"
 #include "NR_RRCReestablishmentRequest.h"
+#include "NR_PCCH-Message.h"
+#include "NR_PagingRecord.h"
 #include "NR_UE-CapabilityRequestFilterNR.h"
 #include "PHY/defs_nr_common.h"
 #include "common/utils/nr/nr_common.h"
@@ -137,6 +140,7 @@
 #include "intertask_interface.h"
 
 #include "common/ran_context.h"
+#include "conversions.h"
 
 //#define XER_PRINT
 
@@ -397,7 +401,7 @@ uint8_t do_SIB1_NR(rrc_gNB_carrier_data_t *carrier,
   NR_BWP_DownlinkCommon_t  *initialDownlinkBWP=&ServCellCom->downlinkConfigCommon.initialDownlinkBWP;
   initialDownlinkBWP->genericParameters=
     configuration->scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters;
-  
+
 
   for(int i = 0; i< configuration->scc->downlinkConfigCommon->frequencyInfoDL->frequencyBandList.list.count; i++) {
     asn1cSequenceAdd(ServCellCom->downlinkConfigCommon.frequencyInfoDL.frequencyBandList.list,
@@ -432,9 +436,9 @@ uint8_t do_SIB1_NR(rrc_gNB_carrier_data_t *carrier,
 		     configuration->scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[i]);
   }
 
-  initialDownlinkBWP->pdcch_ConfigCommon = 
+  initialDownlinkBWP->pdcch_ConfigCommon =
       configuration->scc->downlinkConfigCommon->initialDownlinkBWP->pdcch_ConfigCommon;
-  initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->commonSearchSpaceList = 
+  initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->commonSearchSpaceList =
        CALLOC(1,sizeof(struct NR_PDCCH_ConfigCommon__commonSearchSpaceList));
 
   asn1cSequenceAdd(initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->commonSearchSpaceList->list,
@@ -514,12 +518,12 @@ uint8_t do_SIB1_NR(rrc_gNB_carrier_data_t *carrier,
   ss7->searchSpaceType->choice.common=calloc(1,sizeof(*ss7->searchSpaceType->choice.common));
   ss7->searchSpaceType->choice.common->dci_Format0_0_AndFormat1_0 = calloc(1,sizeof(*ss7->searchSpaceType->choice.common->dci_Format0_0_AndFormat1_0));
 
-  
+
   asn1cCallocOne(initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->searchSpaceSIB1,  0);
   asn1cCallocOne(initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->searchSpaceOtherSystemInformation, 7);
   asn1cCallocOne(initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->pagingSearchSpace, 5);
   asn1cCallocOne( initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->ra_SearchSpace, 1);
-   
+
   initialDownlinkBWP->pdsch_ConfigCommon = configuration->scc->downlinkConfigCommon->initialDownlinkBWP->pdsch_ConfigCommon;
   ServCellCom->downlinkConfigCommon.bcch_Config.modificationPeriodCoeff = NR_BCCH_Config__modificationPeriodCoeff_n2;
   ServCellCom->downlinkConfigCommon.pcch_Config.defaultPagingCycle = NR_PagingCycle_rf256;
@@ -3144,7 +3148,10 @@ uint8_t                   *const buffer,
 size_t                           buffer_size,
 //const uint8_t                    transmission_mode,
 const uint8_t                    Transaction_id,
-NR_SRB_ToAddModList_t               **SRB_configList
+NR_SRB_ToAddModList_t               **SRB_configList,
+OCTET_STRING_t               *masterCellGroup_from_DU,
+NR_ServingCellConfigCommon_t *scc,
+rrc_gNB_carrier_data_t *carrier
 ) {
     asn_enc_rval_t enc_rval;
     //long *logicalchannelgroup = NULL;
@@ -3204,34 +3211,54 @@ NR_SRB_ToAddModList_t               **SRB_configList
 
     *SRB_configList = CALLOC(1, sizeof(LTE_SRB_ToAddModList_t));
     ASN_SEQUENCE_ADD(&(*SRB_configList)->list,SRB1_config);
+    /****************************** masterCellGroup ******************************/
+    /*
+     NR_CellGroupConfig_t *cellGroupConfig = NULL;
+     char masterCellGroup_buf[1000];
+     gNB_RRC_UE_t *ue_p = &ue_context_pP->ue_context;
+     if (masterCellGroup_from_DU) {
+      // decode masterCellGroup OCTET_STRING received from DU and place in ue context
+      uper_decode(NULL,
+		  &asn_DEF_NR_CellGroupConfig,   //might be added prefix later
+		  (void **)&cellGroupConfig,
+		  (uint8_t *)masterCellGroup_from_DU->buf,
+		  masterCellGroup_from_DU->size, 0, 0);
 
+      xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void*)cellGroupConfig);
+    }
+    else {
+      cellGroupConfig = calloc(1, sizeof(NR_CellGroupConfig_t));
+      fill_initial_cellGroupConfig(ue_context_pP->ue_context.rnti,ue_context_pP->local_uid,cellGroupConfig,scc,carrier);
+
+      enc_rval = uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig,
+				       NULL,
+				       (void *)cellGroupConfig,
+				       masterCellGroup_buf,
+				       1000);
+
+      if(enc_rval.encoded == -1) {
+        LOG_E(NR_RRC, "ASN1 message CellGroupConfig encoding failed (%s, %lu)!\n",
+	      enc_rval.failed_type->name, enc_rval.encoded);
+        return -1;
+      }
+    }
+    ue_p->masterCellGroup = cellGroupConfig;
+    */
     rrcReestablishment->rrc_TransactionIdentifier = Transaction_id;
     rrcReestablishment->criticalExtensions.present = NR_RRCReestablishment__criticalExtensions_PR_rrcReestablishment;
     rrcReestablishment->criticalExtensions.choice.rrcReestablishment = CALLOC(1,sizeof(NR_RRCReestablishment_IEs_t));
 
-    uint8_t KgNB_star[32] = { 0 };
-    /** TODO
-    uint16_t pci = nrrrc->carrier[CC_id].physCellId;
-    uint32_t earfcn_dl = (uint32_t)freq_to_arfcn10(RC.mac[ctxt_pP->module_id]->common_channels[CC_id].eutra_band,
-                         nrrrc->carrier[CC_id].dl_CarrierFreq);
-    bool     is_rel8_only = true;
+    uint8_t *KgNB_star;
+    uint16_t pci = RC.nrrrc[ctxt_pP->module_id]->carrier.physCellId;
+    uint32_t nr_arfcn_dl = (uint64_t)*scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencySSB;
     
-    if (earfcn_dl > 65535) {
-      is_rel8_only = false;
-    }
-    LOG_D(NR_RRC, "pci=%d, eutra_band=%d, downlink_frequency=%d, earfcn_dl=%u, is_rel8_only=%s\n",
-          pci,
-          RC.mac[ctxt_pP->module_id]->common_channels[CC_id].eutra_band,
-          nrrrc->carrier[CC_id].dl_CarrierFreq,
-          earfcn_dl,
-          is_rel8_only == true ? "true": "false");
-    */
+    LOG_I(NR_RRC, "Reestablishment update key pci=%d, earfcn_dl=%u\n", pci, nr_arfcn_dl);
     
     if (ue_context_pP->ue_context.nh_ncc >= 0) {
-      //TODO derive_keNB_star(ue_context_pP->ue_context.nh, pci, earfcn_dl, is_rel8_only, KgNB_star);
+      nr_derive_kngran_star(pci, nr_arfcn_dl, ue_context_pP->ue_context.nh, &KgNB_star);
       rrcReestablishment->criticalExtensions.choice.rrcReestablishment->nextHopChainingCount = ue_context_pP->ue_context.nh_ncc;
     } else { // first HO
-      //TODO derive_keNB_star (ue_context_pP->ue_context.kgnb, pci, earfcn_dl, is_rel8_only, KgNB_star);
+      nr_derive_kngran_star(pci, nr_arfcn_dl, ue_context_pP->ue_context.kgnb, &KgNB_star);
       // LG: really 1
       rrcReestablishment->criticalExtensions.choice.rrcReestablishment->nextHopChainingCount = 0;
     }
@@ -3293,6 +3320,52 @@ do_RRCReestablishmentComplete(uint8_t *buffer, size_t buffer_size, int64_t rrc_T
                                    buffer_size);
   AssertFatal (enc_rval.encoded > 0, "ASN1 message encoding failed (%s, %lu)!\n", enc_rval.failed_type->name, enc_rval.encoded);
   LOG_D(NR_RRC,"[UE] RRCReestablishmentComplete Encoded %zd bits (%zd bytes)\n", enc_rval.encoded, (enc_rval.encoded+7)/8);
+  return((enc_rval.encoded+7)/8);
+}
+
+
+uint8_t do_NR_Paging(uint8_t Mod_id, uint8_t *buffer, uint32_t tmsi) {
+  LOG_D(NR_RRC, "[gNB %d] do_NR_Paging start\n", Mod_id);
+  asn_enc_rval_t enc_rval;
+  NR_PCCH_Message_t pcch_msg;
+  NR_PagingRecord_t *paging_record_p = NULL;
+  pcch_msg.message.present           = NR_PCCH_MessageType_PR_c1;
+  pcch_msg.message.choice.c1          = CALLOC(1, sizeof(struct NR_PCCH_MessageType__c1));
+  pcch_msg.message.choice.c1->present = NR_PCCH_MessageType__c1_PR_paging;
+  pcch_msg.message.choice.c1->choice.paging = CALLOC(1,sizeof(NR_Paging_t));
+  pcch_msg.message.choice.c1->choice.paging->pagingRecordList = CALLOC(1,sizeof(*pcch_msg.message.choice.c1->choice.paging->pagingRecordList));
+  pcch_msg.message.choice.c1->choice.paging->nonCriticalExtension = NULL;
+  asn_set_empty(&pcch_msg.message.choice.c1->choice.paging->pagingRecordList->list);
+  pcch_msg.message.choice.c1->choice.paging->pagingRecordList->list.count = 0;
+
+  if ((paging_record_p = calloc(1, sizeof(NR_PagingRecord_t))) == NULL) {
+    /* Possible error on calloc */
+    return (-1);
+  }
+
+  memset(paging_record_p, 0, sizeof(NR_PagingRecord_t));
+
+  /* convert ue_paging_identity_t to PagingUE_Identity_t */
+  paging_record_p->ue_Identity.present = NR_PagingUE_Identity_PR_ng_5G_S_TMSI;
+  // set ng_5G_S_TMSI
+  INT32_TO_BIT_STRING(tmsi, &paging_record_p->ue_Identity.choice.ng_5G_S_TMSI);
+
+  /* add to list */
+  ASN_SEQUENCE_ADD(&pcch_msg.message.choice.c1->choice.paging->pagingRecordList->list, paging_record_p);
+  LOG_D(NR_RRC, "[gNB %d] do_Paging paging_record: PagingRecordList.count %d\n",
+        Mod_id, pcch_msg.message.choice.c1->choice.paging->pagingRecordList->list.count);
+  enc_rval = uper_encode_to_buffer(&asn_DEF_NR_PCCH_Message, NULL, (void *)&pcch_msg, buffer, RRC_BUF_SIZE);
+
+  if(enc_rval.encoded == -1) {
+    LOG_I(NR_RRC, "[gNB AssertFatal]ASN1 message encoding failed (%s, %lu)!\n",
+          enc_rval.failed_type->name, enc_rval.encoded);
+    return -1;
+  }
+
+  if ( LOG_DEBUGFLAG(DEBUG_ASN1) ) {
+    xer_fprint(stdout, &asn_DEF_NR_PCCH_Message, (void *)&pcch_msg);
+  }
+
   return((enc_rval.encoded+7)/8);
 }
 
