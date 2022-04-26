@@ -1463,7 +1463,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
     gNB_mac->TX_req[CC_id].Slot = slot;
     
 #if LATSEQ
-    LATSEQ_P("D mac.mux--mac.txreq","len%d:rnti%d:.pduindex%d.harq%d.reqfm%d.slot%d", TBS, rnti, pduindex, current_harq_pid, frame, slot);
+    LATSEQ_P("D mac.mux--mac.txreq","len%d:rnti%d:lcid%d.pduindex%d.harq%d.reqfm%d.slot%d", TBS, rnti, lcid, pduindex, current_harq_pid, frame, slot);
 #endif
 
     /* mark UE as scheduled */
