@@ -697,6 +697,10 @@ void rx_rf(RU_t *ru,int *frame,int *slot) {
     LOG_E(PHY, "problem receiving samples\n");
   }
 
+#if LATSEQ
+  LATSEQ_P("U phy.in.ant--phy.in.proc","len%d::fm%d.slot%d", rxs, proc->frame_rx, slot);
+#endif
+
   stop_meas(&ru->rx_fhaul);
 }
 
