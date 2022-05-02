@@ -60,6 +60,7 @@
 /* Interface */
 #include "nfapi_nr_interface_scf.h"
 #include "NR_PHY_INTERFACE/NR_IF_Module.h"
+#include "mac_rrc_ul.h"
 
 /* MAC */
 #include "LAYER2/MAC/mac.h"
@@ -692,6 +693,10 @@ typedef struct {
   uint8_t num_rsrp_meas;
 } NR_mac_stats_t;
 
+typedef struct nr_mac_rrc_ul_if_s {
+  /* TODO add other message types as necessary */
+  initial_ul_rrc_message_transfer_func_t initial_ul_rrc_message_transfer;
+} nr_mac_rrc_ul_if_t;
 
 /*! \brief UE list used by gNB to order UEs/CC for scheduling*/
 #define MAX_CSI_REPORTCONFIG 48
@@ -840,6 +845,8 @@ typedef struct gNB_MAC_INST_s {
   uint8_t harq_round_max;
   uint8_t min_grant_prb;
   uint8_t min_grant_mcs;
+
+  nr_mac_rrc_ul_if_t mac_rrc;
 } gNB_MAC_INST;
 
 #endif /*__LAYER2_NR_MAC_GNB_H__ */
