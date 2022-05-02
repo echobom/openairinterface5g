@@ -43,6 +43,9 @@
 #include <openair2/X2AP/x2ap_eNB.h>
 #include <openair1/PHY/NR_TRANSPORT/nr_transport_proto.h>
 #include <nfapi/oai_integration/nfapi_pnf.h>
+#if LATSEQ
+  #include "common/utils/LATSEQ/latseq.h"
+#endif
 
 // should be in a shared lib
 #include <forms.h>
@@ -756,6 +759,10 @@ void tx_rf(RU_t *ru,int frame,int slot, uint64_t timestamp) {
       */
       flags |= beam<<8;
     }
+
+#if LATSEQ
+    LATSEQ_P("D phy.out.proc--phy.out.ant","len%d::fm%d.slot%d", siglen, frame, slot);
+#endif
 
     void *txp[ru->nb_tx];
 
