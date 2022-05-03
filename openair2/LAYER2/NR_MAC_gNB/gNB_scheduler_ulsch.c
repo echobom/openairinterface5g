@@ -1006,8 +1006,7 @@ bool allocate_ul_retransmission(module_id_t module_id,
 
     if (ps->time_domain_allocation != tda
         || ps->dci_format != dci_format
-        || ps->num_dmrs_cdm_grps_no_data != num_dmrs_cdm_grps_no_data
-        || sched_ctrl->update_pusch_ps) {
+        || ps->num_dmrs_cdm_grps_no_data != num_dmrs_cdm_grps_no_data) {
       nr_set_pusch_semi_static(sib1,
                                scc,
                                sched_ctrl->active_ubwp,
@@ -1016,7 +1015,6 @@ bool allocate_ul_retransmission(module_id_t module_id,
                                tda,
                                num_dmrs_cdm_grps_no_data,
                                ps);
-      sched_ctrl->update_pusch_ps = false;
     }
 
     /* Check the resource is enough for retransmission */
@@ -1265,8 +1263,7 @@ void pf_ul(module_id_t module_id,
       const int tda = sched_ctrl->active_ubwp ? nrmac->preferred_ul_tda[sched_ctrl->active_ubwp->bwp_Id][slot] : 0;
       if (ps->time_domain_allocation != tda
           || ps->dci_format != dci_format
-          || ps->num_dmrs_cdm_grps_no_data != num_dmrs_cdm_grps_no_data
-          || sched_ctrl->update_pusch_ps) {
+          || ps->num_dmrs_cdm_grps_no_data != num_dmrs_cdm_grps_no_data) {
         nr_set_pusch_semi_static(sib1,
                                  scc,
                                  sched_ctrl->active_ubwp,
@@ -1275,7 +1272,6 @@ void pf_ul(module_id_t module_id,
                                  tda,
                                  num_dmrs_cdm_grps_no_data,
                                  ps);
-        sched_ctrl->update_pusch_ps = false;
       }
 
       LOG_D(NR_MAC,"Looking for min_rb %d RBs, starting at %d\n", min_rb, rbStart);
@@ -1403,8 +1399,7 @@ void pf_ul(module_id_t module_id,
     const int tda = sched_ctrl->active_ubwp ? nrmac->preferred_ul_tda[sched_ctrl->active_ubwp->bwp_Id][slot] : 0;
     if (ps->time_domain_allocation != tda
         || ps->dci_format != dci_format
-        || ps->num_dmrs_cdm_grps_no_data != num_dmrs_cdm_grps_no_data
-        || sched_ctrl->update_pusch_ps) {
+        || ps->num_dmrs_cdm_grps_no_data != num_dmrs_cdm_grps_no_data) {
       nr_set_pusch_semi_static(sib1,
                                scc,
                                sched_ctrl->active_ubwp,
@@ -1413,7 +1408,6 @@ void pf_ul(module_id_t module_id,
                                tda,
                                num_dmrs_cdm_grps_no_data,
                                ps);
-      sched_ctrl->update_pusch_ps = false;
     }
     update_ul_ue_R_Qm(sched_pusch, ps);
 
