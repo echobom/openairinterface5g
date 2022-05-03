@@ -458,7 +458,7 @@ int nr_process_mac_pdu(module_id_t module_idP,
 
             struct timespec time_request;
             clock_gettime(CLOCK_REALTIME, &time_request);
-            LOG_D(NR_MAC, "In %s: [UE %d] %d.%d : Time %lu.%lu ULSCH -> UL-%s %d (gNB %d, %d bytes)\n",
+            LOG_D(NR_MAC, "In %s: [UE %d] %4d.%2d : Time %lu.%lu ULSCH -> UL-%s %d (gNB %d, %d bytes)\n",
                   __func__,
                   module_idP,
                   frameP,

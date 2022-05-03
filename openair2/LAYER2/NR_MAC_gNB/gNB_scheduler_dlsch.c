@@ -607,6 +607,7 @@ bool allocate_dl_retransmission(module_id_t module_id,
     /* the retransmission will use a different time domain allocation, check
      * that we have enough resources */
     NR_pdsch_semi_static_t temp_ps = *ps;
+
     nr_set_pdsch_semi_static(sib1,
                              scc,
                              cg,
@@ -616,6 +617,7 @@ bool allocate_dl_retransmission(module_id_t module_id,
                              ps->nrOfLayers,
                              sched_ctrl,
                              &temp_ps);
+
     while (rbStart < bwpSize &&
            !(rballoc_mask[rbStart]&SL_to_bitmap(temp_ps.startSymbolIndex, temp_ps.nrOfSymbols)))
       rbStart++;

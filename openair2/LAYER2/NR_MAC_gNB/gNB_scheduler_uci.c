@@ -1679,10 +1679,11 @@ int nr_acknack_scheduling(int mod_id,
     const int s = pucch->ul_slot;
     LOG_D(NR_MAC, "In %s: %4d.%2d DAI = 2 pucch currently in %4d.%2d, advancing by 1 slot\n", __FUNCTION__, frame, slot, f, s);
     if (!(csi_pucch
-        && csi_pucch->csi_bits > 0
-        && csi_pucch->frame == f
-        && csi_pucch->ul_slot == s))
+          && csi_pucch->csi_bits > 0
+          && csi_pucch->frame == f
+          && csi_pucch->ul_slot == s)) {
       nr_fill_nfapi_pucch(mod_id, frame, slot, pucch, UE_id);
+    }
     memset(pucch, 0, sizeof(*pucch));
     pucch->frame = s == n_slots_frame - 1 ? (f + 1) % 1024 : f;
     if(((s + 1)%nr_slots_period) == 0)
@@ -1750,9 +1751,11 @@ int nr_acknack_scheduling(int mod_id,
       const int n_slots_frame = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
       LOG_D(NR_MAC, "In %s: %4d.%2d DAI > 0, cannot reach timing for pucch in %d.%d, advancing slot by 1 and trying again\n", __FUNCTION__, frame, slot, f, s);
       if (!(csi_pucch &&
-          csi_pucch->csi_bits > 0 &&
-          csi_pucch->frame == f &&
-          csi_pucch->ul_slot == s)) nr_fill_nfapi_pucch(mod_id, frame, slot, pucch, UE_id);
+            csi_pucch->csi_bits > 0 &&
+            csi_pucch->frame == f &&
+            csi_pucch->ul_slot == s)) {
+        nr_fill_nfapi_pucch(mod_id, frame, slot, pucch, UE_id);
+      }
       memset(pucch, 0, sizeof(*pucch));
       pucch->frame = s == n_slots_frame - 1 ? (f + 1) % 1024 : f;
       if(((s + 1)%nr_slots_period) == 0)
@@ -1933,7 +1936,7 @@ void nr_sr_reporting(int Mod_idP, frame_t SFN, sub_frame_t slot)
     }
 
     if (!pucch_Config->schedulingRequestResourceToAddModList)
-        continue;
+      continue;
 
     AssertFatal(pucch_Config->schedulingRequestResourceToAddModList->list.count>0,"NO SR configuration available");
 
