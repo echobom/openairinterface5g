@@ -44,9 +44,12 @@
 #include "OCG.h"
 #include "OCG_extern.h"
 
+/* TODO REMOVE_DU_RRC: the RRC in the DU is a hack and should be taken out in the future */
 #include "RRC/LTE/rrc_extern.h"
 #include "RRC/NR/nr_rrc_extern.h"
+#include "RRC/NR/rrc_gNB_UE_context.h"
 #include "RRC/L2_INTERFACE/openair_rrc_L2_interface.h"
+#include "RRC/NR/MESSAGES/asn1_msg.h"
 
 #include "intertask_interface.h"
 
@@ -3268,3 +3271,52 @@ void schedule_nr_bwp_switch(module_id_t module_id,
   }
 }
 */
+
+void send_initial_ul_rrc_message(module_id_t     module_id,
+                                 int             CC_id,
+                                 int             UE_id,
+                                 rb_id_t         srb_id,
+                                 const uint8_t   *sdu,
+                                 sdu_size_t      sdu_len) {
+  const gNB_MAC_INST *mac = RC.nrmac[module_id];
+  const rnti_t rnti = mac->UE_info.rnti[UE_id];
+  LOG_W(MAC,
+        "[RAPROC] Received SDU for CCCH on SRB %ld length %d for UE id %d RNTI %04x\n",
+        srb_id, sdu_len, UE_id, rnti);
+
+  /* TODO REMOVE_DU_RRC: the RRC in the DU is a hack and should be taken out in the future */
+  if (NODE_IS_DU(RC.nrrrc[module_id]->node_type)) {
+    struct rrc_gNB_ue_context_s *ue_context_p = rrc_gNB_allocate_new_UE_context(RC.nrrrc[module_id]);
+    ue_context_p->ue_id_rnti                    = rnti;
+    ue_context_p->ue_context.rnti               = rnti;
+    ue_context_p->ue_context.random_ue_identity = rnti;
+    ue_context_p->ue_context.Srb0.Active        = 1;
+    RB_INSERT(rrc_nr_ue_tree_s, &RC.nrrrc[module_id]->rrc_ue_head, ue_context_p);
+  }
+
+  const NR_ServingCellConfigCommon_t *scc = RC.nrrrc[module_id]->carrier.servingcellconfigcommon;
+  const NR_ServingCellConfig_t *sccd = RC.nrrrc[module_id]->configuration.scd;
+  NR_CellGroupConfig_t cellGroupConfig = {0};
+  fill_initial_cellGroupConfig(UE_id, &cellGroupConfig, scc, sccd, &RC.nrrrc[module_id]->configuration);
+
+  uint8_t du2cu_rrc_container[1024];
+  asn_enc_rval_t enc_rval = uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig,
+                                                  NULL,
+                                                  &cellGroupConfig,
+                                                  du2cu_rrc_container,
+                                                  sizeof(du2cu_rrc_container));
+  AssertFatal(enc_rval.encoded > 0,
+              "Could not encode cellGroupConfig for UE %04x, failed element %s\n",
+              rnti,
+              enc_rval.failed_type->name);
+
+  const f1ap_initial_ul_rrc_message_t ul_rrc_msg = {
+    /* TODO: add mcc, mnc, cell_id, ..., is not available at MAC yet */
+    .crnti = rnti,
+    .rrc_container = (uint8_t *) sdu,
+    .rrc_container_length = sdu_len,
+    .du2cu_rrc_container = (uint8_t *) du2cu_rrc_container,
+    .du2cu_rrc_container_length = (enc_rval.encoded + 7) / 8
+  };
+  mac->mac_rrc.initial_ul_rrc_message_transfer(module_id, &ul_rrc_msg);
+}

@@ -1016,8 +1016,8 @@ long rrc_get_max_nr_csrs(uint8_t max_rbs, long b_SRS) {
 
 void fill_default_downlinkBWP(NR_BWP_Downlink_t *bwp,
                               int bwp_loop,
-                              NR_ServingCellConfig_t *servingcellconfigdedicated,
-                              NR_ServingCellConfigCommon_t *scc,
+                              const NR_ServingCellConfig_t *servingcellconfigdedicated,
+                              const NR_ServingCellConfigCommon_t *scc,
                               const gNB_RrcConfigurationReq *configuration) {
 
   /// BWP common configuration
@@ -1245,8 +1245,8 @@ void fill_default_downlinkBWP(NR_BWP_Downlink_t *bwp,
 
 void fill_default_uplinkBWP(NR_BWP_Uplink_t *ubwp,
                             int bwp_loop,
-                            NR_ServingCellConfig_t *servingcellconfigdedicated,
-                            NR_ServingCellConfigCommon_t *scc,
+                            const NR_ServingCellConfig_t *servingcellconfigdedicated,
+                            const NR_ServingCellConfigCommon_t *scc,
                             const gNB_RrcConfigurationReq *configuration,
                             int uid) {
 
@@ -1533,8 +1533,8 @@ void fill_default_uplinkBWP(NR_BWP_Uplink_t *ubwp,
 
 void fill_initial_SpCellConfig(int uid,
                                NR_SpCellConfig_t *SpCellConfig,
-                               NR_ServingCellConfigCommon_t *scc,
-                               NR_ServingCellConfig_t *servingcellconfigdedicated,
+                               const NR_ServingCellConfigCommon_t *scc,
+                               const NR_ServingCellConfig_t *servingcellconfigdedicated,
                                const gNB_RrcConfigurationReq *configuration)
 {
   // This assert will never happen in the current implementation because NUMBER_OF_UE_MAX = 4.
@@ -2273,8 +2273,8 @@ void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
 
 void fill_initial_cellGroupConfig(int uid,
                                   NR_CellGroupConfig_t *cellGroupConfig,
-                                  NR_ServingCellConfigCommon_t *scc,
-                                  NR_ServingCellConfig_t *servingcellconfigdedicated,
+                                  const NR_ServingCellConfigCommon_t *scc,
+                                  const NR_ServingCellConfig_t *servingcellconfigdedicated,
                                   const gNB_RrcConfigurationReq *configuration)
 {
   NR_RLC_BearerConfig_t                            *rlc_BearerConfig     = NULL;
@@ -2373,13 +2373,14 @@ void fill_initial_cellGroupConfig(int uid,
 }
 
 //------------------------------------------------------------------------------
-int16_t do_RRCSetup(rrc_gNB_ue_context_t          *const ue_context_pP,
-                    uint8_t                       *const buffer,
-                    const uint8_t                 transaction_id,
-                    OCTET_STRING_t                *masterCellGroup_from_DU,
-                    NR_ServingCellConfigCommon_t  *scc,
-                    NR_ServingCellConfig_t        *servingcellconfigdedicated,
-                    const gNB_RrcConfigurationReq *configuration)
+int do_RRCSetup(rrc_gNB_ue_context_t         *const ue_context_pP,
+                uint8_t                      *const buffer,
+                const uint8_t                transaction_id,
+                const uint8_t                *masterCellGroup,
+                int                          masterCellGroup_len,
+                const NR_ServingCellConfigCommon_t *scc,
+                const NR_ServingCellConfig_t        *servingcellconfigdedicated,
+                const gNB_RrcConfigurationReq *configuration)
 //------------------------------------------------------------------------------
 {
     asn_enc_rval_t                                   enc_rval;
@@ -2389,7 +2390,6 @@ int16_t do_RRCSetup(rrc_gNB_ue_context_t          *const ue_context_pP,
     NR_SRB_ToAddMod_t                                *SRB1_config          = NULL;
     NR_PDCP_Config_t                                 *pdcp_Config          = NULL;
     NR_CellGroupConfig_t                             *cellGroupConfig      = NULL;
-    char masterCellGroup_buf[3000];
 
     AssertFatal(ue_context_pP != NULL,"ue_context_p is null\n");
     gNB_RRC_UE_t *ue_p = &ue_context_pP->ue_context;
@@ -2432,38 +2432,14 @@ int16_t do_RRCSetup(rrc_gNB_ue_context_t          *const ue_context_pP,
     ie->radioBearerConfig.securityConfig    = NULL;
     
     /****************************** masterCellGroup ******************************/
-    /* TODO */
-    if (masterCellGroup_from_DU) {
-      memcpy(&ie->masterCellGroup,masterCellGroup_from_DU,sizeof(*masterCellGroup_from_DU));
-      // decode masterCellGroup OCTET_STRING received from DU and place in ue context
-      uper_decode(NULL,
-		  &asn_DEF_NR_CellGroupConfig,   //might be added prefix later
-		  (void **)&cellGroupConfig,
-		  (uint8_t *)masterCellGroup_from_DU->buf,
-		  masterCellGroup_from_DU->size, 0, 0);
-    }
-    else {
-      cellGroupConfig = calloc(1, sizeof(NR_CellGroupConfig_t));
-      fill_initial_cellGroupConfig(ue_context_pP->local_uid,cellGroupConfig,scc,servingcellconfigdedicated,configuration);
+    DevAssert(masterCellGroup && masterCellGroup_len > 0);
+    ie->masterCellGroup.buf = malloc(masterCellGroup_len);
+    AssertFatal(ie->masterCellGroup.buf != NULL, "could not allocate memory for masterCellGroup\n");
+    memcpy(ie->masterCellGroup.buf, masterCellGroup, masterCellGroup_len);
+    ie->masterCellGroup.size = masterCellGroup_len;
 
-      enc_rval = uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig,
-				       NULL,
-				       (void *)cellGroupConfig,
-				       masterCellGroup_buf,
-				       3000);
-      
-      if(enc_rval.encoded == -1) {
-        LOG_E(NR_RRC, "ASN1 message CellGroupConfig encoding failed (%s, %lu)!\n",
-	      enc_rval.failed_type->name, enc_rval.encoded);
-        return -1;
-      }
-      
-      if (OCTET_STRING_fromBuf(&ie->masterCellGroup, masterCellGroup_buf, (enc_rval.encoded+7)/8) == -1) {
-        LOG_E(NR_RRC, "fatal: OCTET_STRING_fromBuf failed\n");
-        return -1;
-      }
-    }
-
+    // decode masterCellGroup OCTET_STRING received from DU and place in ue context
+    uper_decode(NULL, &asn_DEF_NR_CellGroupConfig, (void **)&cellGroupConfig, masterCellGroup, masterCellGroup_len, 0, 0);
     ue_p->masterCellGroup = cellGroupConfig;
 
     if ( LOG_DEBUGFLAG(DEBUG_ASN1) ) {

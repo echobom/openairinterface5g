@@ -542,6 +542,11 @@ void nr_sr_reporting(int Mod_idP, frame_t frameP, sub_frame_t slotP);
 
 void dump_mac_stats(gNB_MAC_INST *gNB, char *output, int strlen, bool reset_rsrp);
 
-void process_CellGroup(NR_CellGroupConfig_t *CellGroup, NR_UE_sched_ctrl_t *sched_ctrl);
+void send_initial_ul_rrc_message(module_id_t     module_idP,
+                                 int             CC_id,
+                                 int             UE_id,
+                                 rb_id_t         srb_idP,
+                                 const uint8_t   *sduP,
+                                 sdu_size_t      sdu_lenP);
 
 #endif /*__LAYER2_NR_MAC_PROTO_H__*/
