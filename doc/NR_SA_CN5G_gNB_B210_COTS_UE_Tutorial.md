@@ -38,7 +38,7 @@ In the following tutorial we describe how to configure and run a 5G end-to-end s
 Minimum hardware requirements:
 - Laptop/Desktop/Server for OAI CN5G and OAI gNB
     - Operating System: [Ubuntu 20.04.4 LTS](https://releases.ubuntu.com/20.04.4/ubuntu-20.04.4-desktop-amd64.iso)
-    - CPU: 8 cores x86_64 @ 3.0 GHz
+    - CPU: 8 cores x86_64 @ 3.5 GHz
     - RAM: 32 GB
 - Laptop for UE
     - Operating System: Microsoft Windows 10 x64
@@ -86,31 +86,36 @@ cd ~/oai-cn5g-fed
 git checkout master
 ./scripts/syncComponents.sh --nrf-branch develop --amf-branch develop --smf-branch develop --spgwu-tiny-branch develop --ausf-branch develop --udm-branch develop --udr-branch develop --upf-vpp-branch develop --nssf-branch develop
 
-docker pull rdefosseoai/oai-amf:develop
-docker pull rdefosseoai/oai-nrf:develop
-docker pull rdefosseoai/oai-smf:develop
-docker pull rdefosseoai/oai-udr:develop
-docker pull rdefosseoai/oai-udm:develop
-docker pull rdefosseoai/oai-ausf:develop
-docker pull rdefosseoai/oai-upf-vpp:develop
-docker pull rdefosseoai/oai-spgwu-tiny:develop
-docker pull rdefosseoai/oai-nssf:develop
+docker pull oaisoftwarealliance/oai-amf:develop
+docker pull oaisoftwarealliance/oai-nrf:develop
+docker pull oaisoftwarealliance/oai-smf:develop
+docker pull oaisoftwarealliance/oai-udr:develop
+docker pull oaisoftwarealliance/oai-udm:develop
+docker pull oaisoftwarealliance/oai-ausf:develop
+docker pull oaisoftwarealliance/oai-upf-vpp:develop
+docker pull oaisoftwarealliance/oai-spgwu-tiny:develop
+docker pull oaisoftwarealliance/oai-nssf:develop
 
-docker image tag rdefosseoai/oai-amf:develop oai-amf:develop
-docker image tag rdefosseoai/oai-nrf:develop oai-nrf:develop
-docker image tag rdefosseoai/oai-smf:develop oai-smf:develop
-docker image tag rdefosseoai/oai-udr:develop oai-udr:develop
-docker image tag rdefosseoai/oai-udm:develop oai-udm:develop
-docker image tag rdefosseoai/oai-ausf:develop oai-ausf:develop
-docker image tag rdefosseoai/oai-upf-vpp:develop oai-upf-vpp:develop
-docker image tag rdefosseoai/oai-spgwu-tiny:develop oai-spgwu-tiny:develop
-docker image tag rdefosseoai/oai-nssf:develop oai-nssf:develop
+docker image tag oaisoftwarealliance/oai-amf:develop oai-amf:develop
+docker image tag oaisoftwarealliance/oai-nrf:develop oai-nrf:develop
+docker image tag oaisoftwarealliance/oai-smf:develop oai-smf:develop
+docker image tag oaisoftwarealliance/oai-udr:develop oai-udr:develop
+docker image tag oaisoftwarealliance/oai-udm:develop oai-udm:develop
+docker image tag oaisoftwarealliance/oai-ausf:develop oai-ausf:develop
+docker image tag oaisoftwarealliance/oai-upf-vpp:develop oai-upf-vpp:develop
+docker image tag oaisoftwarealliance/oai-spgwu-tiny:develop oai-spgwu-tiny:develop
+docker image tag oaisoftwarealliance/oai-nssf:develop oai-nssf:develop
 ```
 
 ## 2.3 OAI CN5G Configuration files
 Download and copy the configuration files to ~/oai-cn5g-fed/docker-compose:
 - [docker-compose-basic-nrf.yaml](tutorial_resources/docker-compose-basic-nrf.yaml)
 - [oai_db.sql](tutorial_resources/oai_db.sql)
+
+Change permissions on oai_db.sql to prevent mysql permission denied error:
+```bash
+chmod 644 ~/oai-cn5g-fed/docker-compose/oai_db.sql
+```
 
 ## 2.4 SIM Card
 Program SIM Card with [Open Cells Project](https://open-cells.com/) application [uicc-v2.5](https://open-cells.com/d5138782a8739209ec5760865b1e53b0/uicc-v2.5.tgz).
