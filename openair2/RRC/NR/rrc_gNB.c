@@ -449,17 +449,6 @@ rrc_gNB_generate_RRCSetup_for_RRCReestablishmentRequest(
   ue_context_pP->ue_context.ue_release_timer_thres = 1000;
   /* init timers */
   //   ue_context_pP->ue_context.ue_rrc_inactivity_timer = 0;
-#ifdef ITTI_SIM
-  MessageDef *message_p;
-  uint8_t *message_buffer;
-  message_buffer = itti_malloc (TASK_RRC_GNB, TASK_RRC_UE_SIM,
-				ue_p->Srb0.Tx_buffer.payload_size);
-  memcpy (message_buffer, (uint8_t*)ue_p->Srb0.Tx_buffer.Payload, ue_p->Srb0.Tx_buffer.payload_size);
-  message_p = itti_alloc_new_message (TASK_RRC_GNB, 0, GNB_RRC_CCCH_DATA_IND);
-  GNB_RRC_CCCH_DATA_IND (message_p).sdu = message_buffer;
-  GNB_RRC_CCCH_DATA_IND (message_p).size  = ue_p->Srb0.Tx_buffer.payload_size;
-  itti_send_msg_to_task (TASK_RRC_UE_SIM, ctxt_pP->instance, message_p);
-#endif
 }
 
 void
@@ -509,16 +498,8 @@ rrc_gNB_generate_RRCReject(
 
     case ngran_gNB:
     {
-#ifdef ITTI_SIM
-      uint8_t *message_buffer;
-      message_buffer = itti_malloc (TASK_RRC_GNB, TASK_RRC_UE_SIM,
-                ue_p->Srb0.Tx_buffer.payload_size);
-      memcpy (message_buffer, (uint8_t*)ue_p->Srb0.Tx_buffer.Payload, ue_p->Srb0.Tx_buffer.payload_size);
-      message_p = itti_alloc_new_message (TASK_RRC_GNB, 0, GNB_RRC_CCCH_DATA_IND);
-      GNB_RRC_CCCH_DATA_IND (message_p).sdu = message_buffer;
-      GNB_RRC_CCCH_DATA_IND (message_p).size  = ue_p->Srb0.Tx_buffer.payload_size;
-      itti_send_msg_to_task (TASK_RRC_UE_SIM, ctxt_pP->instance, message_p);
-#endif
+      // NOTE: there was ITTI_SIM which has been removed. This case is maybe
+      // not necessary anymore
       // rrc_mac_config_req_gNB
     }
       break;
@@ -726,17 +707,6 @@ rrc_gNB_generate_defaultRRCReconfiguration(
 
     case ngran_gNB:
     {
-#ifdef ITTI_SIM
-      MessageDef *message_p;
-      uint8_t *message_buffer;
-      message_buffer = itti_malloc (TASK_RRC_GNB, TASK_RRC_UE_SIM, size);
-      memcpy (message_buffer, buffer, size);
-      message_p = itti_alloc_new_message (TASK_RRC_GNB, 0, GNB_RRC_DCCH_DATA_IND);
-      GNB_RRC_DCCH_DATA_IND (message_p).rbid = DCCH;
-      GNB_RRC_DCCH_DATA_IND (message_p).sdu = message_buffer;
-      GNB_RRC_DCCH_DATA_IND (message_p).size	= size;
-      itti_send_msg_to_task (TASK_RRC_UE_SIM, ctxt_pP->instance, message_p);
-#else
       LOG_D(NR_RRC, "[FRAME %05d][RRC_gNB][MOD %u][][--- PDCP_DATA_REQ/%d Bytes (rrcReconfiguration to UE %x MUI %d) --->][PDCP][MOD %u][RB %u]\n",
           ctxt_pP->frame,
           ctxt_pP->module_id,
@@ -753,7 +723,6 @@ rrc_gNB_generate_defaultRRCReconfiguration(
           buffer,
           PDCP_TRANSMISSION_MODE_CONTROL);
       // rrc_pdcp_config_asn1_req
-#endif
       // rrc_rlc_config_asn1_req
     }
     break;
@@ -989,17 +958,6 @@ rrc_gNB_generate_dedicatedRRCReconfiguration(
         "[FRAME %05d][RRC_gNB][MOD %u][][--- PDCP_DATA_REQ/%d Bytes (rrcReconfiguration to UE %x MUI %d) --->][PDCP][MOD %u][RB %u]\n",
         ctxt_pP->frame, ctxt_pP->module_id, size, ue_context_pP->ue_context.rnti, rrc_gNB_mui, ctxt_pP->module_id, DCCH);
 
-#ifdef ITTI_SIM
-  MessageDef *message_p;
-  uint8_t *message_buffer;
-  message_buffer = itti_malloc (TASK_RRC_GNB_SIM, TASK_RRC_UE_SIM, size);
-  memcpy (message_buffer, buffer, size);
-  message_p = itti_alloc_new_message (TASK_RRC_GNB_SIM, 0, GNB_RRC_DCCH_DATA_IND);
-  GNB_RRC_DCCH_DATA_IND (message_p).rbid = DCCH;
-  GNB_RRC_DCCH_DATA_IND (message_p).sdu = message_buffer;
-  GNB_RRC_DCCH_DATA_IND (message_p).size	= size;
-  itti_send_msg_to_task (TASK_RRC_UE_SIM, ctxt_pP->instance, message_p);
-#else
   nr_rrc_data_req(
     ctxt_pP,
     DCCH,
@@ -1008,7 +966,6 @@ rrc_gNB_generate_dedicatedRRCReconfiguration(
     size,
     buffer,
     PDCP_TRANSMISSION_MODE_CONTROL);
-#endif
 
   if (NODE_IS_DU(rrc->node_type) || NODE_IS_MONOLITHIC(rrc->node_type)) {
     uint32_t delay_ms = ue_context_pP->ue_context.masterCellGroup &&
@@ -1175,17 +1132,6 @@ rrc_gNB_modify_dedicatedRRCReconfiguration(
         "[FRAME %05d][RRC_gNB][MOD %u][][--- PDCP_DATA_REQ/%d Bytes (rrcReconfiguration to UE %x MUI %d) --->][PDCP][MOD %u][RB %u]\n",
         ctxt_pP->frame, ctxt_pP->module_id, size, ue_context_pP->ue_context.rnti, rrc_gNB_mui, ctxt_pP->module_id, DCCH);
 
-#ifdef ITTI_SIM
-  MessageDef *message_p;
-  uint8_t *message_buffer;
-  message_buffer = itti_malloc (TASK_RRC_GNB_SIM, TASK_RRC_UE_SIM, size);
-  memcpy (message_buffer, buffer, size);
-  message_p = itti_alloc_new_message (TASK_RRC_GNB_SIM, 0, GNB_RRC_DCCH_DATA_IND);
-  GNB_RRC_DCCH_DATA_IND (message_p).rbid = DCCH;
-  GNB_RRC_DCCH_DATA_IND (message_p).sdu = message_buffer;
-  GNB_RRC_DCCH_DATA_IND (message_p).size	= size;
-  itti_send_msg_to_task (TASK_RRC_UE_SIM, ctxt_pP->instance, message_p);
-#else
   nr_rrc_data_req(
     ctxt_pP,
     DCCH,
@@ -1194,7 +1140,6 @@ rrc_gNB_modify_dedicatedRRCReconfiguration(
     size,
     buffer,
     PDCP_TRANSMISSION_MODE_CONTROL);
-#endif
 
   if (NODE_IS_DU(RC.nrrrc[ctxt_pP->module_id]->node_type) || NODE_IS_MONOLITHIC(RC.nrrrc[ctxt_pP->module_id]->node_type)) {
     uint32_t delay_ms = ue_context_pP->ue_context.masterCellGroup &&
@@ -1288,17 +1233,6 @@ rrc_gNB_generate_dedicatedRRCReconfiguration_release(
   LOG_D(NR_RRC,
         "[FRAME %05d][RRC_gNB][MOD %u][][--- PDCP_DATA_REQ/%d Bytes (rrcReconfiguration to UE %x MUI %d) --->][PDCP][MOD %u][RB %u]\n",
         ctxt_pP->frame, ctxt_pP->module_id, size, ue_context_pP->ue_context.rnti, rrc_gNB_mui, ctxt_pP->module_id, DCCH);
-#ifdef ITTI_SIM
-  MessageDef *message_p;
-  uint8_t *message_buffer;
-  message_buffer = itti_malloc (TASK_RRC_GNB, TASK_RRC_UE_SIM, size);
-  memcpy (message_buffer, buffer, size);
-  message_p = itti_alloc_new_message (TASK_RRC_GNB, 0, GNB_RRC_DCCH_DATA_IND);
-  GNB_RRC_DCCH_DATA_IND (message_p).rbid = DCCH;
-  GNB_RRC_DCCH_DATA_IND (message_p).sdu = message_buffer;
-  GNB_RRC_DCCH_DATA_IND (message_p).size	= size;
-  itti_send_msg_to_task (TASK_RRC_UE_SIM, ctxt_pP->instance, message_p);
-#else
   nr_rrc_data_req(
     ctxt_pP,
     DCCH,
@@ -1307,7 +1241,6 @@ rrc_gNB_generate_dedicatedRRCReconfiguration_release(
     size,
     buffer,
     PDCP_TRANSMISSION_MODE_CONTROL);
-#endif
 
   if (NODE_IS_DU(RC.nrrrc[ctxt_pP->module_id]->node_type) || NODE_IS_MONOLITHIC(RC.nrrrc[ctxt_pP->module_id]->node_type)) {
     uint32_t delay_ms = ue_context_pP->ue_context.masterCellGroup &&
@@ -1366,7 +1299,6 @@ rrc_gNB_process_RRCReconfigurationComplete(
                         &kRRCint);
   /* Refresh SRBs/DRBs */
 
-#ifndef ITTI_SIM
   LOG_D(NR_RRC,"Configuring PDCP DRBs/SRBs for UE %x\n",ue_context_pP->ue_context.rnti);
 
   nr_rrc_pdcp_config_asn1_req(ctxt_pP,
@@ -1448,7 +1380,6 @@ rrc_gNB_process_RRCReconfigurationComplete(
     }
     itti_send_msg_to_task (TASK_CU_F1, ctxt_pP->module_id, message_p);
   }
-#endif
 
   /* Set the SRB active in UE context */
   if (SRB_configList != NULL) {
@@ -1610,18 +1541,6 @@ rrc_gNB_generate_RRCReestablishment(
             rnti);
     }
 #endif
-#ifdef ITTI_SIM
-        MessageDef *message_p;
-        uint8_t *message_buffer;
-        message_buffer = itti_malloc (TASK_RRC_GNB, TASK_RRC_UE_SIM, ue_context->Srb0.Tx_buffer.payload_size);
-        memcpy (message_buffer, (uint8_t *) ue_context->Srb0.Tx_buffer.Payload, ue_context->Srb0.Tx_buffer.payload_size);
-        message_p = itti_alloc_new_message (TASK_RRC_GNB, 0, GNB_RRC_DCCH_DATA_IND);
-        GNB_RRC_DCCH_DATA_IND (message_p).rbid = DCCH;
-        GNB_RRC_DCCH_DATA_IND (message_p).sdu = message_buffer;
-        GNB_RRC_DCCH_DATA_IND (message_p).size  = ue_context->Srb0.Tx_buffer.payload_size;
-        itti_send_msg_to_task (TASK_RRC_UE_SIM, ctxt_pP->instance, message_p);
-#endif
-
 }
 
 //-----------------------------------------------------------------------------
@@ -1858,17 +1777,6 @@ rrc_gNB_process_RRCConnectionReestablishmentComplete(
     LOG_D(NR_RRC,
           "[FRAME %05d][RRC_gNB][MOD %u][][--- PDCP_DATA_REQ/%d Bytes (rrcConnectionReconfiguration to UE %x MUI %d) --->][PDCP][MOD %u][RB %u]\n",
           ctxt_pP->frame, ctxt_pP->module_id, size, ue_context_pP->ue_context.rnti, rrc_gNB_mui, ctxt_pP->module_id, DCCH);
-#ifdef ITTI_SIM
-  MessageDef *message_p;
-  uint8_t *message_buffer;
-  message_buffer = itti_malloc (TASK_RRC_GNB, TASK_RRC_UE_SIM, size);
-  memcpy (message_buffer, buffer, size);
-  message_p = itti_alloc_new_message (TASK_RRC_GNB, 0, GNB_RRC_DCCH_DATA_IND);
-  GNB_RRC_DCCH_DATA_IND (message_p).rbid = DCCH;
-  GNB_RRC_DCCH_DATA_IND (message_p).sdu = message_buffer;
-  GNB_RRC_DCCH_DATA_IND (message_p).size	= size;
-  itti_send_msg_to_task (TASK_RRC_UE_SIM, ctxt_pP->instance, message_p);
-#else
     nr_rrc_data_req(
       ctxt_pP,
       DCCH,
@@ -1877,7 +1785,6 @@ rrc_gNB_process_RRCConnectionReestablishmentComplete(
       size,
       buffer,
       PDCP_TRANSMISSION_MODE_CONTROL);
-#endif
   }
 
   if (NODE_IS_DU(RC.nrrrc[ctxt_pP->module_id]->node_type) || NODE_IS_MONOLITHIC(RC.nrrrc[ctxt_pP->module_id]->node_type)) {
@@ -3786,17 +3693,6 @@ rrc_gNB_generate_SecurityModeCommand(
         size,
         rrc_gNB_mui,
         DCCH);
-#ifdef ITTI_SIM
-  MessageDef *message_p;
-  uint8_t *message_buffer;
-  message_buffer = itti_malloc (TASK_RRC_GNB, TASK_RRC_UE_SIM,size);
-  memcpy (message_buffer, buffer, size);
-  message_p = itti_alloc_new_message (TASK_RRC_GNB, 0, GNB_RRC_DCCH_DATA_IND);
-  GNB_RRC_DCCH_DATA_IND (message_p).rbid = DCCH;
-  GNB_RRC_DCCH_DATA_IND (message_p).sdu = message_buffer;
-  GNB_RRC_DCCH_DATA_IND (message_p).size	= size;
-  itti_send_msg_to_task (TASK_RRC_UE_SIM, ctxt_pP->instance, message_p);
-#else
   LOG_D(NR_RRC,"calling rrc_data_req :securityModeCommand\n");
   nr_rrc_data_req(ctxt_pP,
                   DCCH,
@@ -3805,7 +3701,6 @@ rrc_gNB_generate_SecurityModeCommand(
                   size,
                   buffer,
                   PDCP_TRANSMISSION_MODE_CONTROL);
-#endif
       break;
 
     default :
@@ -3858,17 +3753,6 @@ rrc_gNB_generate_UECapabilityEnquiry(
         size,
         rrc_gNB_mui,
         DCCH);
-#ifdef ITTI_SIM
-  MessageDef *message_p;
-  uint8_t *message_buffer;
-  message_buffer = itti_malloc (TASK_RRC_GNB, TASK_RRC_UE_SIM, size);
-  memcpy (message_buffer, buffer, size);
-  message_p = itti_alloc_new_message (TASK_RRC_GNB, 0, GNB_RRC_DCCH_DATA_IND);
-  GNB_RRC_DCCH_DATA_IND (message_p).rbid = DCCH;
-  GNB_RRC_DCCH_DATA_IND (message_p).sdu = message_buffer;
-  GNB_RRC_DCCH_DATA_IND (message_p).size  = size;
-  itti_send_msg_to_task (TASK_RRC_UE_SIM, ctxt_pP->instance, message_p);
-#else
   nr_rrc_data_req(ctxt_pP,
                   DCCH,
                   rrc_gNB_mui++,
@@ -3876,7 +3760,6 @@ rrc_gNB_generate_UECapabilityEnquiry(
                   size,
                   buffer,
                   PDCP_TRANSMISSION_MODE_CONTROL);
-#endif
   break;
 
     default :
@@ -3918,17 +3801,6 @@ rrc_gNB_generate_RRCRelease(
         rrc_gNB_mui,
         DCCH);
 
-#ifdef ITTI_SIM
-    MessageDef *message_p;
-    uint8_t *message_buffer;
-    message_buffer = itti_malloc (TASK_RRC_GNB, TASK_RRC_UE_SIM, size);
-    memcpy (message_buffer, buffer, size);
-    message_p = itti_alloc_new_message (TASK_RRC_GNB, 0, GNB_RRC_DCCH_DATA_IND);
-    GNB_RRC_DCCH_DATA_IND (message_p).rbid = DCCH;
-    GNB_RRC_DCCH_DATA_IND (message_p).sdu = message_buffer;
-    GNB_RRC_DCCH_DATA_IND (message_p).size  = size;
-    itti_send_msg_to_task (TASK_RRC_UE_SIM, ctxt_pP->instance, message_p);
-#else
   if (NODE_IS_CU(RC.nrrrc[ctxt_pP->module_id]->node_type)) {
     uint8_t *message_buffer = itti_malloc (TASK_RRC_GNB, TASK_CU_F1, size);
     memcpy (message_buffer, buffer, size);
@@ -3951,7 +3823,6 @@ rrc_gNB_generate_RRCRelease(
     rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_COMPLETE(ctxt_pP->instance, ue_context_pP->ue_context.gNB_ue_ngap_id);
     ue_context_pP->ue_context.ue_release_timer_rrc = 1;
   }
-#endif
 }
 void nr_rrc_trigger(protocol_ctxt_t *ctxt, int CC_id, int frame, int subframe)
 {
