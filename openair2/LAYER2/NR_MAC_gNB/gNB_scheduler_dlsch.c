@@ -749,8 +749,7 @@ void pf_dl(module_id_t module_id,
     /* retransmission */
     if (sched_pdsch->dl_harq_pid >= 0) {
       /* Allocate retransmission */
-      bool r = allocate_dl_retransmission(
-                 module_id, frame, slot, rballoc_mask, &n_rb_sched, UE_id, sched_pdsch->dl_harq_pid);
+      bool r = allocate_dl_retransmission(module_id, frame, slot, rballoc_mask, &n_rb_sched, UE_id, sched_pdsch->dl_harq_pid);
 
       if (!r) {
         LOG_D(NR_MAC, "%4d.%2d retransmission can NOT be allocated\n", frame, slot);
@@ -1012,8 +1011,9 @@ void nr_fr1_dlsch_preprocessor(module_id_t module_id, frame_t frame, sub_frame_t
     rballoc_mask[i] = (~vrb_map[i+BWPStart])&0x3fff; //bitwise not and 14 symbols
 
     // if all the pdsch symbols are free
-    if((rballoc_mask[i]&slbitmap) == slbitmap)
+    if ((rballoc_mask[i]&slbitmap) == slbitmap) {
       n_rb_sched++;
+    }
   }
 
   /* Retrieve amount of data to send for this UE */
@@ -1304,11 +1304,9 @@ void nr_schedule_ue_spec(module_id_t module_id,
     if (bwp) AssertFatal(bwp->bwp_Dedicated->pdsch_Config->choice.setup->resourceAllocation == NR_PDSCH_Config__resourceAllocation_resourceAllocationType1,
                            "Only frequency resource allocation type 1 is currently supported\n");
 
-    dci_payload.frequency_domain_assignment.val =
-      PRBalloc_to_locationandbandwidth0(
-        pdsch_pdu->rbSize,
-        pdsch_pdu->rbStart,
-        pdsch_pdu->BWPSize);
+    dci_payload.frequency_domain_assignment.val = PRBalloc_to_locationandbandwidth0(pdsch_pdu->rbSize,
+                                                                                    pdsch_pdu->rbStart,
+                                                                                    pdsch_pdu->BWPSize);
     dci_payload.format_indicator = 1;
     dci_payload.time_domain_assignment.val = ps->time_domain_allocation;
     dci_payload.mcs = sched_pdsch->mcs;
