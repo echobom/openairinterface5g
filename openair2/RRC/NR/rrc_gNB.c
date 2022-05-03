@@ -321,8 +321,7 @@ void apply_macrlc_config_reest(gNB_RRC_INST *rrc,
                              NULL,
                              0,
                              rnti,
-                             get_softmodem_params()->sa ? ue_context_pP->ue_context.masterCellGroup : (NR_CellGroupConfig_t *)NULL,
-                             0);
+                             get_softmodem_params()->sa ? ue_context_pP->ue_context.masterCellGroup : NULL);
 
       nr_rrc_rlc_config_asn1_req(ctxt_pP,
                                  ue_context_pP->ue_context.SRB_configList,
