@@ -647,11 +647,16 @@ int main( int argc, char **argv ) {
   set_taus_seed (0);
   printf("configuring for RAU/RRU\n");
 
+
   if (opp_enabled ==1) {
     reset_opp_meas();
   }
 
   cpuf=get_cpu_freq_GHz();
+
+#if LATSEQ
+  init_latseq("/tmp/nr-softmodem", (uint64_t)(cpuf*1000000000LL));
+#endif
 
   itti_init(TASK_MAX, tasks_info);
 
@@ -822,6 +827,10 @@ int main( int argc, char **argv ) {
       }
 
   #endif*/
+#if LATSEQ
+  close_latseq(); //close before end of threads
+#endif
+  
   printf("stopping MODEM threads\n");
   // cleanup
   stop_gNB(NB_gNB_INST);
