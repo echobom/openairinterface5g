@@ -595,8 +595,8 @@ void nr_set_pdsch_semi_static(const NR_SIB1_t *sib1,
   }
   LOG_D(NR_MAC,"MCS Table Index: %d\n",ps->mcsTableIdx);
 
-  NR_PDSCH_Config_t *pdsch_Config=NULL;
-  if (bwpd) pdsch_Config = bwpd->pdsch_Config->choice.setup;
+  NR_PDSCH_Config_t *pdsch_Config = NULL;
+  if (bwpd && bwpd->pdsch_Config) pdsch_Config = bwpd->pdsch_Config->choice.setup;
   LOG_D(NR_MAC,"tda %d, ps->time_domain_allocation %d,layers %d, ps->nrOfLayers %d, pdsch_config %p\n",tda,ps->time_domain_allocation,layers,ps->nrOfLayers,pdsch_Config);
   if (ps->time_domain_allocation != tda) {
     reset_dmrs = true;
@@ -2357,8 +2357,7 @@ int add_new_nr_ue(module_id_t mod_idP, rnti_t rntiP, NR_CellGroupConfig_t *CellG
         CellGroup->spCellConfig &&
         CellGroup->spCellConfig->spCellConfigDedicated &&
         CellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig &&
-        CellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig->choice.setup
-        )
+        CellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig->choice.setup)
       compute_csi_bitlen (CellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig->choice.setup, UE_info, UE_id, mod_idP);
     NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
     memset(sched_ctrl, 0, sizeof(*sched_ctrl));
@@ -2406,9 +2405,8 @@ int add_new_nr_ue(module_id_t mod_idP, rnti_t rntiP, NR_CellGroupConfig_t *CellG
                                                   scc,
                                                   genericParameters,
                                                   NULL);
-    sched_ctrl->bwp_switch_info.current_bwp = bwp_id;
-    sched_ctrl->bwp_switch_info.next_bwp = -1;
-    sched_ctrl->bwp_switch_info.bwp_switch_state = BWP_SWITCH_INACTIVE;
+    sched_ctrl->next_dl_bwp_id = -1;
+    sched_ctrl->next_ul_bwp_id = -1;
     const struct NR_UplinkConfig__uplinkBWP_ToAddModList *ubwpList = servingCellConfig ? servingCellConfig->uplinkConfig->uplinkBWP_ToAddModList : NULL;
     if (ubwpList) AssertFatal(ubwpList->list.count <= NR_MAX_NUM_BWP,
 			      "uplinkBWP_ToAddModList has %d BWP!\n",
@@ -2684,7 +2682,7 @@ void nr_csirs_scheduling(int Mod_idP,
 
       nfapi_nr_dl_tti_request_body_t *dl_req = &gNB_mac->DL_req[CC_id].dl_tti_request_body;
       NR_BWP_t *genericParameters = sched_ctrl->active_bwp ?
-                                    &sched_ctrl->active_bwp->bwp_Common->genericParameters:
+                                    &sched_ctrl->active_bwp->bwp_Common->genericParameters :
                                     &gNB_mac->common_channels[0].ServingCellConfigCommon->downlinkConfigCommon->initialDownlinkBWP->genericParameters;
       for (int id = 0; id < csi_measconfig->nzp_CSI_RS_ResourceToAddModList->list.count; id++){
         nzpcsi = csi_measconfig->nzp_CSI_RS_ResourceToAddModList->list.array[id];
@@ -2861,10 +2859,8 @@ void nr_csirs_scheduling(int Mod_idP,
 void nr_mac_update_timers(module_id_t module_id,
                           frame_t frame,
                           sub_frame_t slot) {
-
   NR_UE_info_t *UE_info = &RC.nrmac[module_id]->UE_info;
   const NR_list_t *UE_list = &UE_info->list;
-
   for (int UE_id = UE_list->head; UE_id >= 0; UE_id = UE_list->next[UE_id]) {
     NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
     if (sched_ctrl->rrc_processing_timer > 0) {
@@ -2872,113 +2868,74 @@ void nr_mac_update_timers(module_id_t module_id,
       if (sched_ctrl->rrc_processing_timer == 0) {
         LOG_I(NR_MAC, "(%d.%d) De-activating RRC processing timer for UE %d\n", frame, slot, UE_id);
 
-        const NR_ServingCellConfig_t *spCellConfigDedicated = UE_info->CellGroup[UE_id] && UE_info->CellGroup[UE_id]->spCellConfig ?
-            UE_info->CellGroup[UE_id]->spCellConfig->spCellConfigDedicated : NULL;
+        const NR_SIB1_t *sib1 = RC.nrmac[module_id]->common_channels[0].sib1 ? RC.nrmac[module_id]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL;
+        NR_CellGroupConfig_t *cg = UE_info->CellGroup[UE_id];
+        NR_ServingCellConfigCommon_t *scc = RC.nrmac[module_id]->common_channels[0].ServingCellConfigCommon;
+        const NR_ServingCellConfig_t *spCellConfigDedicated = cg && cg->spCellConfig ? cg->spCellConfig->spCellConfigDedicated : NULL;
 
         // If needed, update the Dedicated BWP
         const int current_bwp_id = sched_ctrl->active_bwp ? sched_ctrl->active_bwp->bwp_Id : 0;
         const int current_ubwp_id = sched_ctrl->active_ubwp ? sched_ctrl->active_ubwp->bwp_Id : 0;
-        if(spCellConfigDedicated &&
+        if (spCellConfigDedicated &&
            spCellConfigDedicated->downlinkBWP_ToAddModList &&
            spCellConfigDedicated->uplinkConfig &&
            spCellConfigDedicated->uplinkConfig->uplinkBWP_ToAddModList) {
-          if(*spCellConfigDedicated->firstActiveDownlinkBWP_Id != current_bwp_id) {
+          if (*spCellConfigDedicated->firstActiveDownlinkBWP_Id != current_bwp_id) {
             sched_ctrl->active_bwp = spCellConfigDedicated->downlinkBWP_ToAddModList->list.array[*spCellConfigDedicated->firstActiveDownlinkBWP_Id - 1];
             LOG_I(NR_MAC, "Changing to DL-BWP %li\n", sched_ctrl->active_bwp->bwp_Id);
           }
-          if(*spCellConfigDedicated->uplinkConfig->firstActiveUplinkBWP_Id != current_ubwp_id) {
+          if (*spCellConfigDedicated->uplinkConfig->firstActiveUplinkBWP_Id != current_ubwp_id) {
             sched_ctrl->active_ubwp = spCellConfigDedicated->uplinkConfig->uplinkBWP_ToAddModList->list.array[*spCellConfigDedicated->uplinkConfig->firstActiveUplinkBWP_Id - 1];
             LOG_I(NR_MAC, "Changing to UL-BWP %li\n", sched_ctrl->active_ubwp->bwp_Id);
           }
         }
 
-        const NR_SIB1_t *sib1 = RC.nrmac[module_id]->common_channels[0].sib1 ? RC.nrmac[module_id]->common_channels[0].sib1->message.choice.c1->choice.systemInformationBlockType1 : NULL;
-        NR_ServingCellConfigCommon_t *scc = RC.nrmac[module_id]->common_channels[0].ServingCellConfigCommon;
-
-        NR_BWP_DownlinkDedicated_t *bwpd = spCellConfigDedicated ? spCellConfigDedicated->initialDownlinkBWP : NULL;
+        NR_BWP_Downlink_t *bwp = sched_ctrl->active_bwp;
+        NR_BWP_DownlinkDedicated_t *bwpd = cg &&
+                                           cg->spCellConfig &&
+                                           cg->spCellConfig->spCellConfigDedicated ?
+                                           cg->spCellConfig->spCellConfigDedicated->initialDownlinkBWP : NULL;
+        int **preferred_dl_tda = RC.nrmac[module_id]->preferred_dl_tda;
+        NR_pdsch_semi_static_t *ps = &sched_ctrl->pdsch_semi_static;
 
         const uint8_t layers = set_dl_nrOfLayers(sched_ctrl);
-        const int tda = sched_ctrl->active_bwp && RC.nrmac[module_id]->preferred_dl_tda[sched_ctrl->active_bwp->bwp_Id][slot] >= 0 ?
-                        RC.nrmac[module_id]->preferred_dl_tda[sched_ctrl->active_bwp->bwp_Id][slot] :
-                        (sched_ctrl->pdsch_semi_static.time_domain_allocation >= 0 ? sched_ctrl->pdsch_semi_static.time_domain_allocation : 0);
+        const int tda = bwp && preferred_dl_tda[bwp->bwp_Id][slot] >= 0 ?
+                        preferred_dl_tda[bwp->bwp_Id][slot] : (ps->time_domain_allocation >= 0 ? ps->time_domain_allocation : 0);
 
         nr_set_pdsch_semi_static(sib1,
                                  scc,
-                                 UE_info->CellGroup[UE_id],
-                                 sched_ctrl->active_bwp,
+                                 cg,
+                                 bwp,
                                  bwpd,
                                  tda,
                                  layers,
                                  sched_ctrl,
-                                 &sched_ctrl->pdsch_semi_static);
+                                 ps);
 
-        NR_BWP_UplinkDedicated_t *ubwpd = spCellConfigDedicated &&
-                                          spCellConfigDedicated->uplinkConfig ?
-                                          spCellConfigDedicated->uplinkConfig->initialUplinkBWP : NULL;
+        NR_BWP_Uplink_t *ubwp = sched_ctrl->active_ubwp;
+        NR_BWP_UplinkDedicated_t *ubwpd = cg &&
+                                          cg->spCellConfig &&
+                                          cg->spCellConfig->spCellConfigDedicated &&
+                                          cg->spCellConfig->spCellConfigDedicated->uplinkConfig ?
+                                          cg->spCellConfig->spCellConfigDedicated->uplinkConfig->initialUplinkBWP : NULL;
+        int **preferred_ul_tda = RC.nrmac[module_id]->preferred_ul_tda;
+        NR_pusch_semi_static_t *ups = &sched_ctrl->pusch_semi_static;
 
-        const uint8_t num_dmrs_cdm_grps_no_data = (sched_ctrl->active_ubwp || ubwpd) ? 1 : 2;
         int dci_format = get_dci_format(sched_ctrl);
-        const int utda = sched_ctrl->active_ubwp && RC.nrmac[module_id]->preferred_ul_tda[sched_ctrl->active_ubwp->bwp_Id][slot] >= 0 ?
-            RC.nrmac[module_id]->preferred_ul_tda[sched_ctrl->active_ubwp->bwp_Id][slot] :
-                         (sched_ctrl->pusch_semi_static.time_domain_allocation >= 0 ? sched_ctrl->pusch_semi_static.time_domain_allocation : 0);
+        const uint8_t num_dmrs_cdm_grps_no_data = (ubwp || ubwpd) ? 1 : 2;
+        const int utda = ubwp && preferred_ul_tda[ubwp->bwp_Id][slot] >= 0 ?
+            preferred_ul_tda[ubwp->bwp_Id][slot] : (ups->time_domain_allocation >= 0 ? ups->time_domain_allocation : 0);
 
         nr_set_pusch_semi_static(sib1,
                                  scc,
-                                 sched_ctrl->active_ubwp,
+                                 ubwp,
                                  ubwpd,
                                  dci_format,
                                  utda,
                                  num_dmrs_cdm_grps_no_data,
-                                 &sched_ctrl->pusch_semi_static);
-
+                                 ups);
       }
     }
-  }
-}
-
-void nr_bwp_switch(module_id_t module_id,
-                   frame_t frame,
-                   sub_frame_t slot,
-                   int UE_id,
-                   int bwp_id) {
-
-  NR_UE_info_t *UE_info = &RC.nrmac[module_id]->UE_info;
-  NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
-
-  switch(sched_ctrl->bwp_switch_info.bwp_switch_state) {
-
-    case BWP_SWITCH_TO_START:
-      LOG_W(NR_MAC,"(%d.%d) [UE_id %d] Schedule BWP switch from bwp_id %ld to %d\n",
-            frame, slot, UE_id, UE_info->UE_sched_ctrl[UE_id].active_bwp->bwp_Id, bwp_id);
-      sched_ctrl->bwp_switch_info.bwp_switch_state = BWP_SWITCH_RUNNING;
-      sched_ctrl->bwp_switch_info.bwp_switch_slot = slot;
-      nr_mac_rrc_bwp_switch_req(module_id, frame, slot, UE_info->rnti[UE_id], bwp_id);
-      break;
-
-    case BWP_SWITCH_RUNNING:
-      // The BWP switching takes at least 10+6 ms (3GPP TS 38.331 Section 12)
-      // gNB needs time to schedule and send RRCReconfiguration message
-      // Therefore, we wait for the same slot in next frame (10 ms) before update bwp_id in the gNB
-      if (sched_ctrl->bwp_switch_info.bwp_switch_slot == slot) {
-        const NR_ServingCellConfig_t *servingCellConfig = UE_info->CellGroup[UE_id] ? UE_info->CellGroup[UE_id]->spCellConfig->spCellConfigDedicated : NULL;
-        const struct NR_ServingCellConfig__downlinkBWP_ToAddModList *bwpList = servingCellConfig ? servingCellConfig->downlinkBWP_ToAddModList : NULL;
-        const int bwp_id = servingCellConfig && servingCellConfig->firstActiveDownlinkBWP_Id ?
-                           *servingCellConfig->firstActiveDownlinkBWP_Id : 0;
-        sched_ctrl->active_bwp = bwpList && bwp_id > 0 ? bwpList->list.array[bwp_id - 1] : NULL;
-        const struct NR_UplinkConfig__uplinkBWP_ToAddModList *ubwpList = servingCellConfig ? servingCellConfig->uplinkConfig->uplinkBWP_ToAddModList : NULL;
-        const int ubwp_id = servingCellConfig && servingCellConfig->uplinkConfig && servingCellConfig->uplinkConfig->firstActiveUplinkBWP_Id ?
-                            *servingCellConfig->uplinkConfig->firstActiveUplinkBWP_Id : 0;
-        sched_ctrl->active_ubwp = ubwpList && ubwp_id > 0 ? ubwpList->list.array[ubwp_id - 1] : NULL;
-        sched_ctrl->bwp_switch_info.bwp_switch_state = BWP_SWITCH_INACTIVE;
-      }
-      break;
-
-    case BWP_SWITCH_INACTIVE:
-      break;
-
-    default:
-      AssertFatal(1==0,"Invalid bwp switch state\n");
-      break;
   }
 }
 
@@ -2990,16 +2947,21 @@ void schedule_nr_bwp_switch(module_id_t module_id,
   const NR_list_t *UE_list = &UE_info->list;
 
   // TODO: Implementation of a algorithm to perform:
-  //  - the BWP switch trigger: sched_ctrl->bwp_switch_info.bwp_switch_state = BWP_SWITCH_TO_START
-  //  - the BWP selection:      sched_ctrl->bwp_switch_info.next_bwp = bwp_id
+  //  - DL BWP selection:     sched_ctrl->next_dl_bwp_id = dl_bwp_id
+  //  - UL BWP selection:     sched_ctrl->next_ul_bwp_id = ul_bwp_id
 
   for (int UE_id = UE_list->head; UE_id >= 0; UE_id = UE_list->next[UE_id]) {
     NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
-    if(sched_ctrl->bwp_switch_info.bwp_switch_state > BWP_SWITCH_INACTIVE) {
-      nr_bwp_switch(module_id, frame, slot, UE_id, sched_ctrl->bwp_switch_info.next_bwp);
+    if (sched_ctrl->rrc_processing_timer == 0 &&
+        UE_info->Msg4_ACKed[UE_id] == true &&
+        ((sched_ctrl->next_dl_bwp_id >= 0 && sched_ctrl->active_bwp && sched_ctrl->active_bwp->bwp_Id != sched_ctrl->next_dl_bwp_id) ||
+        (sched_ctrl->next_ul_bwp_id >= 0 && sched_ctrl->active_ubwp && sched_ctrl->active_ubwp->bwp_Id != sched_ctrl->next_ul_bwp_id))) {
+
+      LOG_W(NR_MAC,"(%d.%d) [UE_id %d] Schedule BWP switch from dl_bwp_id %ld to %ld and from ul_bwp_id %ld to %ld\n",
+            frame, slot, UE_id, sched_ctrl->active_bwp->bwp_Id, sched_ctrl->next_dl_bwp_id, sched_ctrl->active_ubwp->bwp_Id, sched_ctrl->next_ul_bwp_id);
+      nr_mac_rrc_bwp_switch_req(module_id, frame, slot, UE_info->rnti[UE_id], sched_ctrl->next_dl_bwp_id, sched_ctrl->next_ul_bwp_id);
     }
   }
-
 }
 
 /*void fill_nfapi_coresets_and_searchspaces(NR_CellGroupConfig_t *cg,

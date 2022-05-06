@@ -268,7 +268,7 @@ uint8_t compute_ri_bitlen(struct NR_CSI_ReportConfig *csi_reportconfig,
     }
     return ri_restriction;
   }
-  else
+  else 
     AssertFatal(1==0,"Other configurations not yet implemented\n");
   return -1;
 }
@@ -716,15 +716,14 @@ void nr_csi_meas_reporting(int Mod_idP,
     NR_PUCCH_Config_t *pucch_Config = NULL;
     if (sched_ctrl->active_ubwp) {
       pucch_Config = sched_ctrl->active_ubwp->bwp_Dedicated->pucch_Config->choice.setup;
-    } else if (RC.nrmac[Mod_idP]->UE_info.CellGroup[UE_id] &&
-             RC.nrmac[Mod_idP]->UE_info.CellGroup[UE_id]->spCellConfig &&
-             RC.nrmac[Mod_idP]->UE_info.CellGroup[UE_id]->spCellConfig->spCellConfigDedicated &&
-             RC.nrmac[Mod_idP]->UE_info.CellGroup[UE_id]->spCellConfig->spCellConfigDedicated->uplinkConfig &&
-             RC.nrmac[Mod_idP]->UE_info.CellGroup[UE_id]->spCellConfig->spCellConfigDedicated->uplinkConfig->initialUplinkBWP &&
-             RC.nrmac[Mod_idP]->UE_info.CellGroup[UE_id]->spCellConfig->spCellConfigDedicated->uplinkConfig->initialUplinkBWP->pucch_Config->choice.setup) {
-      pucch_Config = RC.nrmac[Mod_idP]->UE_info.CellGroup[UE_id]->spCellConfig->spCellConfigDedicated->uplinkConfig->initialUplinkBWP->pucch_Config->choice.setup;
+    } else if (CellGroup &&
+               CellGroup->spCellConfig &&
+               CellGroup->spCellConfig->spCellConfigDedicated &&
+               CellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig &&
+               CellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->initialUplinkBWP &&
+               CellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->initialUplinkBWP->pucch_Config->choice.setup) {
+      pucch_Config = CellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->initialUplinkBWP->pucch_Config->choice.setup;
     }
-
 
     for (int csi_report_id = 0; csi_report_id < csi_measconfig->csi_ReportConfigToAddModList->list.count; csi_report_id++){
       NR_CSI_ReportConfig_t *csirep = csi_measconfig->csi_ReportConfigToAddModList->list.array[csi_report_id];
@@ -877,7 +876,7 @@ int checkTargetSSBInTCIStates_pdcchConfig(int ssb_index_t, int Mod_idP, int UE_i
   NR_TCI_State_t *tci =NULL;
   NR_TCI_StateId_t *tci_id = NULL;
   NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
-  const int bwp_id  = sched_ctrl->active_bwp ? sched_ctrl->active_bwp->bwp_Id : 0;
+  const int bwp_id = sched_ctrl->active_bwp ? sched_ctrl->active_bwp->bwp_Id : 0;
   NR_BWP_Downlink_t *bwp = CellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list.array[bwp_id-1];
   NR_ControlResourceSet_t *coreset = bwp->bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList->list.array[bwp_id-1];
   int i;
@@ -947,18 +946,16 @@ void tci_handling(module_id_t Mod_idP, int UE_id, frame_t frame, slot_t slot) {
   uint8_t idx = 0;
   NR_UE_info_t *UE_info = &RC.nrmac[Mod_idP]->UE_info;
   NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
-  const int bwp_id  = sched_ctrl->active_bwp ? sched_ctrl->active_bwp->bwp_Id : 0;
+  const int bwp_id = sched_ctrl->active_bwp ? sched_ctrl->active_bwp->bwp_Id : 0;
   NR_CellGroupConfig_t *CellGroup = UE_info->CellGroup[UE_id];
-  NR_BWP_Downlink_t *bwp = bwp_id>0 ?
-                           sched_ctrl->active_bwp:
-                           NULL;
-
+  NR_BWP_Downlink_t *bwp = bwp_id > 0 ? sched_ctrl->active_bwp : NULL;
 
   //bwp indicator
   int n_dl_bwp=0;
-  if (CellGroup->spCellConfig->spCellConfigDedicated &&
+  if (CellGroup->spCellConfig &&
+      CellGroup->spCellConfig->spCellConfigDedicated &&
       CellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList)
-      n_dl_bwp = CellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list.count;
+    n_dl_bwp = CellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list.count;
 
   uint8_t nr_ssbri_cri = 0;
   uint8_t nb_of_csi_ssb_report = UE_info->csi_report_template[UE_id][cqi_idx].nb_of_csi_ssb_report;
@@ -1627,18 +1624,10 @@ int nr_acknack_scheduling(int mod_id,
   const NR_ServingCellConfigCommon_t *scc = RC.nrmac[mod_id]->common_channels[CC_id].ServingCellConfigCommon;
   const int n_slots_frame = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
   const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
-  // initializing the values for FDD
-  int nr_slots_period = n_slots_frame;
-  int first_ul_slot_tdd = slot + minfbtime;
-  int first_ul_slot_period = 0;
-  if(tdd){
-    nr_slots_period /= get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
-    first_ul_slot_tdd = tdd->nrofDownlinkSlots + nr_slots_period * (slot / nr_slots_period);
-    first_ul_slot_period = tdd->nrofDownlinkSlots;
-  }
-  else
-    // if TDD configuration is not present and the band is not FDD, it means it is a dynamic TDD configuration
-    AssertFatal(RC.nrmac[mod_id]->common_channels[CC_id].frame_type == FDD,"Dynamic TDD not handled yet\n");
+  AssertFatal(tdd || RC.nrmac[mod_id]->common_channels[CC_id].frame_type == FDD, "Dynamic TDD not handled yet\n");
+  const int nr_slots_period = tdd ? n_slots_frame / get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity) : n_slots_frame;
+  const int next_ul_slot = tdd ? tdd->nrofDownlinkSlots + nr_slots_period * (slot / nr_slots_period) : slot + minfbtime;
+  const int first_ul_slot_period = tdd ? tdd->nrofDownlinkSlots : 0;
 
 
   /* for the moment, we consider:
@@ -1684,11 +1673,10 @@ int nr_acknack_scheduling(int mod_id,
     const int s = pucch->ul_slot;
     LOG_D(NR_MAC, "In %s: %4d.%2d DAI = 2 pucch currently in %4d.%2d, advancing by 1 slot\n", __FUNCTION__, frame, slot, f, s);
     if (!(csi_pucch
-          && csi_pucch->csi_bits > 0
-          && csi_pucch->frame == f
-          && csi_pucch->ul_slot == s)) {
+        && csi_pucch->csi_bits > 0
+        && csi_pucch->frame == f
+        && csi_pucch->ul_slot == s))
       nr_fill_nfapi_pucch(mod_id, frame, slot, pucch, UE_id);
-    }
     memset(pucch, 0, sizeof(*pucch));
     pucch->frame = s == n_slots_frame - 1 ? (f + 1) % 1024 : f;
     if(((s + 1)%nr_slots_period) == 0)
@@ -1754,13 +1742,12 @@ int nr_acknack_scheduling(int mod_id,
       const int f = pucch->frame;
       const int s = pucch->ul_slot;
       const int n_slots_frame = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
-      LOG_D(NR_MAC, "In %s: %4d.%2d DAI > 0, cannot reach timing for pucch in %d.%d, advancing slot by 1 and trying again\n", __FUNCTION__, frame, slot, f, s);
+      LOG_D(NR_MAC, "In %s: %4d.%2d DAI > 0, cannot reach timing for pucch in %4d.%2d, advancing slot by 1 and trying again\n", __FUNCTION__, frame, slot, f, s);
       if (!(csi_pucch &&
-            csi_pucch->csi_bits > 0 &&
-            csi_pucch->frame == f &&
-            csi_pucch->ul_slot == s)) {
+          csi_pucch->csi_bits > 0 &&
+          csi_pucch->frame == f &&
+          csi_pucch->ul_slot == s))
         nr_fill_nfapi_pucch(mod_id, frame, slot, pucch, UE_id);
-      }
       memset(pucch, 0, sizeof(*pucch));
       pucch->frame = s == n_slots_frame - 1 ? (f + 1) % 1024 : f;
       if(((s + 1)%nr_slots_period) == 0)
@@ -1795,8 +1782,8 @@ int nr_acknack_scheduling(int mod_id,
     AssertFatal(pucch->sr_flag + pucch->dai_c == 0,
                 "expected no SR/AckNack for UE %d in %4d.%2d, but has %d/%d for %4d.%2d\n",
                 UE_id, frame, slot, pucch->sr_flag, pucch->dai_c, pucch->frame, pucch->ul_slot);
-    const int s = first_ul_slot_tdd;
-    pucch->frame = (s < n_slots_frame - 1) ? frame : (frame + 1) % 1024;
+    const int s = next_ul_slot;
+    pucch->frame = s < n_slots_frame ? frame : (frame + 1) % 1024;
     pucch->ul_slot = s % n_slots_frame;
   }
 
