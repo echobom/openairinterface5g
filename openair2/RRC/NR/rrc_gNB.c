@@ -509,19 +509,6 @@ rrc_gNB_generate_RRCSetup_for_RRCReestablishmentRequest(
           PROTOCOL_NR_RRC_CTXT_UE_FMT" RRC_gNB --- MAC_CONFIG_REQ  (SRB1) ---> MAC_gNB\n",
           PROTOCOL_NR_RRC_CTXT_UE_ARGS(ctxt_pP));
 
-  rrc_mac_config_req_gNB(rrc_instance_p->module_id,
-                         rrc_instance_p->configuration.ssb_SubcarrierOffset,
-                         rrc_instance_p->configuration.pdsch_AntennaPorts,
-                         rrc_instance_p->configuration.pusch_AntennaPorts,
-                         rrc_instance_p->configuration.sib1_tda,
-                         rrc_instance_p->configuration.minRXTXTIME,
-                         rrc_instance_p->carrier.servingcellconfigcommon,
-                         &rrc_instance_p->carrier.mib,
-                         rrc_instance_p->carrier.siblock1,
-                         0,
-                         ue_context_pP->ue_context.rnti,
-                         NULL);
-
   LOG_I(NR_RRC,
         PROTOCOL_NR_RRC_CTXT_UE_FMT" [RAPROC] Logical Channel DL-CCCH, Generating RRCSetup (bytes %d)\n",
         PROTOCOL_NR_RRC_CTXT_UE_ARGS(ctxt_pP),
@@ -654,7 +641,7 @@ rrc_gNB_generate_defaultRRCReconfiguration(
 )
 //-----------------------------------------------------------------------------
 {
-  uint8_t                       buffer[RRC_BUF_SIZE];
+  uint8_t                       buffer[RRC_BUF_SIZE] = {0};
   uint16_t                      size;
   /*NR_SRB_ToAddModList_t        **SRB_configList2 = NULL;
   NR_SRB_ToAddModList_t        *SRB_configList  = ue_context_pP->ue_context.SRB_configList;
@@ -766,8 +753,7 @@ rrc_gNB_generate_defaultRRCReconfiguration(
 
   gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
   gNB_RRC_UE_t *ue_p = &ue_context_pP->ue_context;
-  memset(buffer, 0, sizeof(buffer));
-  size = do_RRCReconfiguration(ctxt_pP, buffer, sizeof(buffer),
+  size = do_RRCReconfiguration(ctxt_pP, buffer, RRC_BUF_SIZE,
                                 xid,
                                 NULL, //*SRB_configList2,
                                 NULL, //*DRB_configList,
@@ -888,7 +874,7 @@ rrc_gNB_generate_dedicatedRRCReconfiguration(
   struct NR_RRCReconfiguration_v1530_IEs__dedicatedNAS_MessageList
                                 *dedicatedNAS_MessageList = NULL;
   NR_DedicatedNAS_Message_t     *dedicatedNAS_Message = NULL;
-  uint8_t                        buffer[RRC_BUF_SIZE];
+  uint8_t                        buffer[RRC_BUF_SIZE] = {0};
   uint16_t                       size;
   int                            qos_flow_index = 0;
   int                            pdu_sessions_done = 0;
@@ -1046,12 +1032,11 @@ rrc_gNB_generate_dedicatedRRCReconfiguration(
     dedicatedNAS_MessageList = NULL;
   }
 
-  memset(buffer, 0, sizeof(buffer));
   cellGroupConfig = calloc(1, sizeof(NR_CellGroupConfig_t));
   fill_mastercellGroupConfig(cellGroupConfig,
                              ue_context_pP->ue_context.masterCellGroup,
                              rrc->um_on_default_drb);
-  size = do_RRCReconfiguration(ctxt_pP, buffer, sizeof(buffer),
+  size = do_RRCReconfiguration(ctxt_pP, buffer, RRC_BUF_SIZE,
                                 xid,
                                 *SRB_configList2,
                                 *DRB_configList,
@@ -1131,7 +1116,7 @@ rrc_gNB_modify_dedicatedRRCReconfiguration(
   struct NR_RRCReconfiguration_v1530_IEs__dedicatedNAS_MessageList
                                 *dedicatedNAS_MessageList = NULL;
   NR_DedicatedNAS_Message_t     *dedicatedNAS_Message = NULL;
-  uint8_t                        buffer[RRC_BUF_SIZE];
+  uint8_t                        buffer[RRC_BUF_SIZE] = {0};
   uint16_t                       size;
   int                            qos_flow_index = 0;
   int i, j;
@@ -1236,8 +1221,7 @@ rrc_gNB_modify_dedicatedRRCReconfiguration(
     dedicatedNAS_MessageList = NULL;
   }
 
-  memset(buffer, 0, sizeof(buffer));
-  size = do_RRCReconfiguration(ctxt_pP, buffer, sizeof(buffer),
+  size = do_RRCReconfiguration(ctxt_pP, buffer, RRC_BUF_SIZE,
                                 xid,
                                 NULL,
                                 DRB_configList2,
@@ -1314,7 +1298,7 @@ rrc_gNB_generate_dedicatedRRCReconfiguration_release(
     uint8_t                 *nas_buffer)
 //-----------------------------------------------------------------------------
 {
-  uint8_t                             buffer[RRC_BUF_SIZE];
+  uint8_t                             buffer[RRC_BUF_SIZE] = {0};
   int                                 i;
   uint16_t                            size  = 0;
   NR_DRB_ToReleaseList_t             **DRB_Release_configList2 = NULL;
@@ -1351,8 +1335,7 @@ rrc_gNB_generate_dedicatedRRCReconfiguration_release(
     LOG_W(NR_RRC,"dedlicated NAS list is empty\n");
   }
 
-  memset(buffer, 0, sizeof(buffer));
-  size = do_RRCReconfiguration(ctxt_pP, buffer, sizeof(buffer), xid,
+  size = do_RRCReconfiguration(ctxt_pP, buffer, RRC_BUF_SIZE, xid,
                                NULL,
                                NULL,
                                *DRB_Release_configList2,
@@ -1671,7 +1654,7 @@ rrc_gNB_generate_RRCReestablishment(
   NR_SRB_ToAddModList_t      **SRB_configList;
   gNB_RRC_UE_t               *ue_context = NULL;
   module_id_t                module_id = ctxt_pP->module_id;
-  uint8_t                    buffer[RRC_BUF_SIZE];
+  uint8_t                    buffer[RRC_BUF_SIZE] = {0};
   uint16_t                   size  = 0;
   gNB_RRC_INST               *rrc_instance_p = RC.nrrrc[ctxt_pP->module_id];
   int enable_ciphering=0;
@@ -1679,7 +1662,6 @@ rrc_gNB_generate_RRCReestablishment(
   SRB_configList = &(ue_context_pP->ue_context.SRB_configList);
   //carrier = &(RC.nrrrc[ctxt_pP->module_id]->carrier);
   ue_context = &(ue_context_pP->ue_context);
-  memset(buffer, 0, RRC_BUF_SIZE);
   size = do_RRCReestablishment(ctxt_pP,
       ue_context_pP,
       CC_id,
@@ -1790,7 +1772,7 @@ rrc_gNB_generate_RRCReestablishment(
 
 //-----------------------------------------------------------------------------
 void
-rrc_gNB_process_RRCConnectionReestablishmentComplete(
+rrc_gNB_process_RRCReestablishmentComplete(
   const protocol_ctxt_t *const ctxt_pP,
   const rnti_t reestablish_rnti,
   rrc_gNB_ue_context_t         *ue_context_pP,
@@ -1799,7 +1781,7 @@ rrc_gNB_process_RRCConnectionReestablishmentComplete(
 //-----------------------------------------------------------------------------
 {
   LOG_I(NR_RRC,
-        PROTOCOL_RRC_CTXT_UE_FMT" [RAPROC] Logical Channel UL-DCCH, processing NR_RRCConnectionReestablishmentComplete from UE (SRB1 Active)\n",
+        PROTOCOL_RRC_CTXT_UE_FMT" [RAPROC] Logical Channel UL-DCCH, processing NR_RRCReestablishmentComplete from UE (SRB1 Active)\n",
         PROTOCOL_RRC_CTXT_UE_ARGS(ctxt_pP));
 
   NR_DRB_ToAddModList_t                 *DRB_configList = ue_context_pP->ue_context.DRB_configList;
@@ -1810,7 +1792,7 @@ rrc_gNB_process_RRCConnectionReestablishmentComplete(
   NR_DRB_ToAddMod_t                     *DRB_config      = NULL;
   //NR_SDAP_Config_t                      *sdap_config     = NULL;
   int i = 0;
-  uint8_t                             buffer[RRC_BUF_SIZE];
+  uint8_t                             buffer[RRC_BUF_SIZE] = {0};
   uint16_t                            size;
 
   uint8_t next_xid = rrc_gNB_get_next_transaction_identifier(ctxt_pP->module_id);
@@ -1969,11 +1951,7 @@ rrc_gNB_process_RRCConnectionReestablishmentComplete(
   ue_context_pP->ue_context.rnti               = ctxt_pP->rnti;
 
   if (AMF_MODE_ENABLED) {
-    uint8_t send_security_mode_command = FALSE;
-    nr_rrc_pdcp_config_security(
-      ctxt_pP,
-      ue_context_pP,
-      send_security_mode_command ? 0 : 1);
+    nr_rrc_pdcp_config_security(ctxt_pP, ue_context_pP, 0);
     LOG_D(NR_RRC, "set security successfully \n");
   }
 
@@ -1988,19 +1966,15 @@ rrc_gNB_process_RRCConnectionReestablishmentComplete(
           i, ue_context_pP->ue_context.pduSession[i].status, "PDU_SESSION_STATUS_DONE");
   }
 
-  memset(buffer, 0, sizeof(buffer));
-
+  gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
   NR_CellGroupConfig_t *cellGroupConfig = calloc(1, sizeof(NR_CellGroupConfig_t));
-  fill_mastercellGroupConfig(cellGroupConfig,
-                             ue_context_pP->ue_context.masterCellGroup,
-                             RC.nrrrc[ctxt_pP->module_id]->um_on_default_drb);
+  fill_mastercellGroupConfig(cellGroupConfig, ue_context_pP->ue_context.masterCellGroup, rrc->um_on_default_drb);
   for(i = 0; i < cellGroupConfig->rlc_BearerToAddModList->list.count; i++) {
     cellGroupConfig->rlc_BearerToAddModList->list.array[i]->reestablishRLC = CALLOC(1, sizeof(*cellGroupConfig->rlc_BearerToAddModList->list.array[i]->reestablishRLC));
     *cellGroupConfig->rlc_BearerToAddModList->list.array[i]->reestablishRLC = NR_RLC_BearerConfig__reestablishRLC_true;
   }
 
-  gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
-  size = do_RRCReconfiguration(ctxt_pP, buffer, sizeof(buffer),
+  size = do_RRCReconfiguration(ctxt_pP, buffer, RRC_BUF_SIZE,
                                next_xid,
                                *SRB_configList2,
                                DRB_configList,
@@ -2015,7 +1989,8 @@ rrc_gNB_process_RRCConnectionReestablishmentComplete(
                                NULL,
                                cellGroupConfig);
 
-  LOG_DUMPMSG(NR_RRC,DEBUG_RRC,(char *)buffer,size, "[MSG] RRC Reconfiguration\n");
+  LOG_DUMPMSG(NR_RRC,DEBUG_RRC,(char *)buffer,size,
+              "[MSG] RRC Reconfiguration\n");
 
   /* Free all NAS PDUs */
   for (i = 0; i < ue_context_pP->ue_context.nb_of_pdusessions; i++) {
@@ -2933,7 +2908,7 @@ rrc_gNB_decode_dcch(
 
             case NR_UL_DCCH_MessageType__c1_PR_rrcReestablishmentComplete:
               LOG_DUMPMSG(NR_RRC,DEBUG_RRC,(char *)Rx_sdu,sdu_sizeP,
-                          "[MSG] NR_RRC Connection Reestablishment Complete\n");
+                          "[MSG] NR RRC Reestablishment Complete\n");
               LOG_I(NR_RRC,
                     PROTOCOL_RRC_CTXT_UE_FMT" RLC RB %02d --- RLC_DATA_IND %d bytes "
                     "(rrcConnectionReestablishmentComplete) ---> RRC_gNB\n",
@@ -2958,7 +2933,7 @@ rrc_gNB_decode_dcch(
 
                 if (!ue_context_p) {
                   LOG_E(NR_RRC,
-                        PROTOCOL_NR_RRC_CTXT_UE_FMT" NR_RRCConnectionReestablishmentComplete without UE context, falt\n",
+                        PROTOCOL_NR_RRC_CTXT_UE_FMT" NR_RRCReestablishmentComplete without UE context, falt\n",
                         PROTOCOL_NR_RRC_CTXT_UE_ARGS(ctxt_pP));
                   break;
                 }
@@ -2970,7 +2945,7 @@ rrc_gNB_decode_dcch(
 
                 if(UE_id == -1) {
                   LOG_E(NR_RRC,
-                        PROTOCOL_RRC_CTXT_UE_FMT" NR_RRCConnectionReestablishmentComplete without UE_id(MAC) rnti %x, fault\n",
+                        PROTOCOL_RRC_CTXT_UE_FMT" NR_RRCReestablishmentComplete without UE_id(MAC) rnti %x, fault\n",
                         PROTOCOL_RRC_CTXT_UE_ARGS(ctxt_pP),ctxt_pP->rnti);
                   break;
                 }
@@ -2980,7 +2955,7 @@ rrc_gNB_decode_dcch(
 
                 if (ul_dcch_msg->message.choice.c1->choice.rrcReestablishmentComplete->criticalExtensions.present ==
                     NR_RRCReestablishmentComplete__criticalExtensions_PR_rrcReestablishmentComplete) {
-                  rrc_gNB_process_RRCConnectionReestablishmentComplete(ctxt_pP, reestablish_rnti, ue_context_p,
+                  rrc_gNB_process_RRCReestablishmentComplete(ctxt_pP, reestablish_rnti, ue_context_p,
                       ul_dcch_msg->message.choice.c1->choice.rrcReestablishmentComplete->rrc_TransactionIdentifier);
                   mac_remove_nr_ue(ctxt_pP->module_id, reestablish_rnti);
                 }
@@ -3964,6 +3939,7 @@ void *rrc_gnb_task(void *args_p) {
       case NGAP_UE_CONTEXT_RELEASE_COMMAND:
         rrc_gNB_process_NGAP_UE_CONTEXT_RELEASE_COMMAND(msg_p, msg_name_p, instance);
         break;
+
       case NGAP_PAGING_IND:
           rrc_gNB_process_PAGING_IND(msg_p, msg_name_p, instance);
         break;
@@ -4143,10 +4119,8 @@ rrc_gNB_generate_RRCRelease(
 )
 //-----------------------------------------------------------------------------
 {
-  uint8_t buffer[RRC_BUF_SIZE];
+  uint8_t buffer[RRC_BUF_SIZE] = {0};
   uint16_t size = 0;
-
-  memset(buffer, 0, sizeof(buffer));
 
   size = do_NR_RRCRelease(buffer, sizeof(buffer),
                           rrc_gNB_get_next_transaction_identifier(ctxt_pP->module_id));

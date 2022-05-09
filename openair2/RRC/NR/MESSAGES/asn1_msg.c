@@ -1618,7 +1618,8 @@ void fill_initial_SpCellConfig(int uid,
   // one symbol (13)
   NR_PUCCH_Resource_t *pucchres0=calloc(1,sizeof(*pucchres0));
   pucchres0->pucch_ResourceId=0;
-  pucchres0->startingPRB=(uid+8) % curr_bwp;
+  //pucchres0->startingPRB=0;
+  pucchres0->startingPRB=(8+uid) % (curr_bwp/2);
   LOG_D(NR_RRC, "pucchres0->startPRB %ld uid %d curr_bwp %d\n", pucchres0->startingPRB, uid, curr_bwp);
   pucchres0->intraSlotFrequencyHopping=NULL;
   pucchres0->secondHopPRB=NULL;
@@ -3146,20 +3147,16 @@ uint8_t do_RRCReestablishmentRequest(uint8_t Mod_id, uint8_t *buffer, uint16_t c
 }
 
 //------------------------------------------------------------------------------
-uint8_t
-do_RRCReestablishment(
-const protocol_ctxt_t     *const ctxt_pP,
-rrc_gNB_ue_context_t      *const ue_context_pP,
-int                              CC_id,
-uint8_t                   *const buffer,
-size_t                           buffer_size,
-//const uint8_t                    transmission_mode,
-const uint8_t                    Transaction_id,
-NR_SRB_ToAddModList_t               **SRB_configList,
-OCTET_STRING_t               *masterCellGroup_from_DU,
-NR_ServingCellConfigCommon_t *scc,
-rrc_gNB_carrier_data_t *carrier
-) {
+uint8_t do_RRCReestablishment(const protocol_ctxt_t *const ctxt_pP,
+                              rrc_gNB_ue_context_t *const ue_context_pP,
+                              int CC_id,
+                              uint8_t *const buffer,
+                              size_t buffer_size,
+                              const uint8_t Transaction_id,
+                              NR_SRB_ToAddModList_t **SRB_configList,
+                              OCTET_STRING_t *masterCellGroup_from_DU,
+                              NR_ServingCellConfigCommon_t *scc,
+                              rrc_gNB_carrier_data_t *carrier) {
     asn_enc_rval_t enc_rval;
     //long *logicalchannelgroup = NULL;
     struct NR_SRB_ToAddMod *SRB1_config = NULL;
