@@ -207,7 +207,7 @@ nr_rrc_data_req(
   return TRUE; // TODO should be changed to a CNF message later, currently RRC lite does not used the returned value anyway.
 }
 
-int mac_rrc_nr_data_req(const module_id_t Mod_idP,
+uint16_t mac_rrc_nr_data_req(const module_id_t Mod_idP,
                         const int         CC_id,
                         const frame_t     frameP,
                         const rb_id_t     Srb_id,
