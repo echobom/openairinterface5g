@@ -948,11 +948,11 @@ void tci_handling(module_id_t Mod_idP, int UE_id, frame_t frame, slot_t slot) {
   NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
   int bwp_id  = sched_ctrl->active_bwp ? 1 : 0;
   NR_CellGroupConfig_t *CellGroup = UE_info->CellGroup[UE_id];
-  NR_BWP_Downlink_t *bwp = bwp_id>0 ?
+  NR_BWP_Downlink_t *bwp = bwp_id>0 ? 
                            sched_ctrl->active_bwp:
                            NULL;
 
-
+                               
   //bwp indicator
   int n_dl_bwp=0;
   if (CellGroup->spCellConfig->spCellConfigDedicated &&
@@ -1080,7 +1080,7 @@ void tci_handling(module_id_t Mod_idP, int UE_id, frame_t frame, slot_t slot) {
       }
     }
 
-    sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.tci_present_inDCI = bwp ?
+    sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.tci_present_inDCI = bwp ? 
                                                                    bwp->bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList->list.array[bwp_id-1]->tci_PresentInDCI :
                                                                    CellGroup->spCellConfig->spCellConfigDedicated->initialDownlinkBWP->pdcch_Config->choice.setup->controlResourceSetToAddModList->list.array[0]->tci_PresentInDCI;
 
@@ -1669,10 +1669,10 @@ int nr_acknack_scheduling(int mod_id,
     const int f = pucch->frame;
     const int s = pucch->ul_slot;
     LOG_D(NR_MAC, "In %s: %4d.%2d DAI = 2 pucch currently in %4d.%2d, advancing by 1 slot\n", __FUNCTION__, frame, slot, f, s);
-    if (!(csi_pucch
+    if (!(csi_pucch 
         && csi_pucch->csi_bits > 0
         && csi_pucch->frame == f
-        && csi_pucch->ul_slot == s))
+        && csi_pucch->ul_slot == s)) 
       nr_fill_nfapi_pucch(mod_id, frame, slot, pucch, UE_id);
     memset(pucch, 0, sizeof(*pucch));
     pucch->frame = s == n_slots_frame - 1 ? (f + 1) % 1024 : f;
@@ -1684,7 +1684,7 @@ int nr_acknack_scheduling(int mod_id,
     // skip the CSI PUCCH if it is present and if in the next frame/slot
     // and if we don't multiplex
     csi_pucch->r_pucch=-1;
-    if (csi_pucch
+    if (csi_pucch 
         && csi_pucch->csi_bits > 0
         && csi_pucch->frame == pucch->frame
         && csi_pucch->ul_slot == pucch->ul_slot

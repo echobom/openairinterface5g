@@ -2043,6 +2043,7 @@ nr_rrc_ue_establish_srb2(
                            NR_UE_rrc_inst[ctxt_pP->module_id].kgnb, &kRRCenc);
      nr_derive_key_rrc_int(NR_UE_rrc_inst[ctxt_pP->module_id].integrityProtAlgorithm,
                            NR_UE_rrc_inst[ctxt_pP->module_id].kgnb, &kRRCint);
+
 #ifndef ITTI_SIM
      // Refresh SRBs
      nr_rrc_pdcp_config_asn1_req(ctxt_pP,
@@ -2736,7 +2737,7 @@ nr_rrc_ue_process_ueCapabilityEnquiry(
 }
 
 //-----------------------------------------------------------------------------
-void rrc_ue_generate_RRCReestablishmentRequest( const protocol_ctxt_t *const ctxt_pP, const uint8_t gNB_index ) 
+void rrc_ue_generate_RRCReestablishmentRequest( const protocol_ctxt_t *const ctxt_pP, const uint8_t gNB_index )
 {
   NR_UE_rrc_inst[ctxt_pP->module_id].Srb0[gNB_index].Tx_buffer.payload_size =
     do_RRCReestablishmentRequest(

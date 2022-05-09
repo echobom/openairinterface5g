@@ -207,13 +207,13 @@ nr_rrc_data_req(
   return TRUE; // TODO should be changed to a CNF message later, currently RRC lite does not used the returned value anyway.
 }
 
-int    mac_rrc_nr_data_req(const module_id_t Mod_idP,
-                           const int         CC_id,
-                           const frame_t     frameP,
-                           const rb_id_t     Srb_id,
-                           const rnti_t      rnti,
-                           const uint8_t     Nb_tb,
-                           uint8_t *const    buffer_pP ){
+int mac_rrc_nr_data_req(const module_id_t Mod_idP,
+                        const int         CC_id,
+                        const frame_t     frameP,
+                        const rb_id_t     Srb_id,
+                        const rnti_t      rnti,
+                        const uint8_t     Nb_tb,
+                        uint8_t *const    buffer_pP ){
 
 #ifdef DEBUG_RRC
   LOG_D(RRC,"[eNB %d] mac_rrc_data_req to SRB ID=%ld\n",Mod_idP,Srb_id);
@@ -269,7 +269,6 @@ int    mac_rrc_nr_data_req(const module_id_t Mod_idP,
   if( (Srb_id & RAB_OFFSET ) == CCCH) {
 
     char *payload_pP;
-    uint16_t Sdu_size = 0;
     struct rrc_gNB_ue_context_s *ue_context_p = rrc_gNB_get_ue_context(RC.nrrrc[Mod_idP], rnti);
 
     LOG_D(NR_RRC,"[gNB %d] Frame %d CCCH request (Srb_id %ld)\n", Mod_idP, frameP, Srb_id);
@@ -277,8 +276,7 @@ int    mac_rrc_nr_data_req(const module_id_t Mod_idP,
       LOG_I(NR_RRC,"[gNB %d] Frame %d CCCH request but no ue_context\n", Mod_idP, frameP);
       return 0;
     }
-    AssertFatal(ue_context_p!=NULL,"failed to get ue_context\n");
-    uint16_t payload_size = ue_context_p->ue_context.Srb0.Tx_buffer.payload_size;
+    int payload_size = ue_context_p->ue_context.Srb0.Tx_buffer.payload_size;
 
     // check if data is there for MAC
     if (payload_size > 0) {
@@ -286,13 +284,12 @@ int    mac_rrc_nr_data_req(const module_id_t Mod_idP,
       LOG_D(NR_RRC,"[gNB %d] CCCH has %d bytes (dest: %p, src %p)\n", Mod_idP, payload_size, buffer_pP, payload_pP);
       // Fill buffer
       memcpy((void *)buffer_pP, (void*)payload_pP, payload_size);
-      Sdu_size = payload_size;
       ue_context_p->ue_context.Srb0.Tx_buffer.payload_size = 0;
     }
-    return Sdu_size;
+    return payload_size;
   }
 
-  return(0);
+  return 0;
 
 }
 

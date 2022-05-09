@@ -1101,7 +1101,7 @@ void fill_initial_SpCellConfig(int uid,
   pucchfmt2->pi2BPSK=NULL;
   pucchfmt2->simultaneousHARQ_ACK_CSI=calloc(1,sizeof(*pucchfmt2->simultaneousHARQ_ACK_CSI));
   *pucchfmt2->simultaneousHARQ_ACK_CSI=NR_PUCCH_FormatConfig__simultaneousHARQ_ACK_CSI_true;
-
+  
   pucch_Config->spatialRelationInfoToAddModList = calloc(1,sizeof(*pucch_Config->spatialRelationInfoToAddModList));
   NR_PUCCH_SpatialRelationInfo_t *pucchspatial = calloc(1,sizeof(*pucchspatial));
   pucchspatial->pucch_SpatialRelationInfoId = 1;
@@ -1409,7 +1409,7 @@ void fill_initial_SpCellConfig(int uid,
   SpCellConfig->spCellConfigDedicated->pdsch_ServingCellConfig->choice.setup = pdsch_servingcellconfig;
 
   if (configuration->do_CSIRS) {
-
+ 
     SpCellConfig->spCellConfigDedicated->csi_MeasConfig=calloc(1,sizeof(*SpCellConfig->spCellConfigDedicated->csi_MeasConfig));
     SpCellConfig->spCellConfigDedicated->csi_MeasConfig->present = NR_SetupRelease_CSI_MeasConfig_PR_setup;
 
@@ -1419,7 +1419,7 @@ void fill_initial_SpCellConfig(int uid,
     if (pdsch_AntennaPorts > 1) {
       csi_MeasConfig->csi_IM_ResourceToAddModList = calloc(1,sizeof(*csi_MeasConfig->csi_IM_ResourceToAddModList));
       NR_CSI_IM_Resource_t *imres0 = calloc(1,sizeof(*imres0));
-      imres0->csi_IM_ResourceId = 0;
+      imres0->csi_IM_ResourceId = 0; 
       imres0->csi_IM_ResourceElementPattern = calloc(1,sizeof(*imres0->csi_IM_ResourceElementPattern));
       imres0->csi_IM_ResourceElementPattern->present = NR_CSI_IM_Resource__csi_IM_ResourceElementPattern_PR_pattern1;
       imres0->csi_IM_ResourceElementPattern->choice.pattern1 = calloc(1,sizeof(*imres0->csi_IM_ResourceElementPattern->choice.pattern1));
@@ -1434,7 +1434,7 @@ void fill_initial_SpCellConfig(int uid,
       ASN_SEQUENCE_ADD(&csi_MeasConfig->csi_IM_ResourceToAddModList->list,imres0);
       csi_MeasConfig->csi_IM_ResourceSetToAddModList = calloc(1,sizeof(*csi_MeasConfig->csi_IM_ResourceSetToAddModList));
       NR_CSI_IM_ResourceSet_t *imset0 = calloc(1,sizeof(*imset0));
-      imset0->csi_IM_ResourceSetId = 0;
+      imset0->csi_IM_ResourceSetId = 0; 
       NR_CSI_IM_ResourceId_t *res0 = calloc(1,sizeof(*res0));
       *res0 = 0;
       ASN_SEQUENCE_ADD(&imset0->csi_IM_Resources,res0);
@@ -1452,7 +1452,7 @@ void fill_initial_SpCellConfig(int uid,
 
     csi_MeasConfig->csi_SSB_ResourceSetToAddModList = calloc(1,sizeof(*csi_MeasConfig->csi_SSB_ResourceSetToAddModList));
     csi_MeasConfig->csi_SSB_ResourceSetToReleaseList = NULL;
-
+  
     NR_CSI_SSB_ResourceSet_t *ssbresset0 = calloc(1,sizeof(*ssbresset0));
     ssbresset0->csi_SSB_ResourceSetId=0;
 
@@ -1497,7 +1497,7 @@ void fill_initial_SpCellConfig(int uid,
    csires0->bwp_Id = 0;
    csires0->resourceType = NR_CSI_ResourceConfig__resourceType_periodic;
    ASN_SEQUENCE_ADD(&csi_MeasConfig->csi_ResourceConfigToAddModList->list,csires0);
-
+ 
 
    NR_CSI_ResourceConfig_t *csires1 = calloc(1,sizeof(*csires1));
    csires1->csi_ResourceConfigId=1;
@@ -1550,7 +1550,7 @@ void fill_initial_SpCellConfig(int uid,
      *csirep1->reportFreqConfiguration->cqi_FormatIndicator=NR_CSI_ReportConfig__reportFreqConfiguration__cqi_FormatIndicator_widebandCQI;
      csirep1->reportFreqConfiguration->pmi_FormatIndicator = calloc(1,sizeof(*csirep1->reportFreqConfiguration->pmi_FormatIndicator));
      *csirep1->reportFreqConfiguration->pmi_FormatIndicator=NR_CSI_ReportConfig__reportFreqConfiguration__pmi_FormatIndicator_widebandPMI;
-     csirep1->reportFreqConfiguration->csi_ReportingBand = NULL;
+     csirep1->reportFreqConfiguration->csi_ReportingBand = NULL; 
 /*calloc(1,sizeof(*csirep1->reportFreqConfiguration->csi_ReportingBand));
      csirep1->reportFreqConfiguration->csi_ReportingBand->present = NR_CSI_ReportConfig__reportFreqConfiguration__csi_ReportingBand_PR_subbands7;
      csirep1->reportFreqConfiguration->csi_ReportingBand->choice.subbands7.size=1;
@@ -1697,7 +1697,7 @@ void fill_mastercellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig, NR_CellGr
   if (use_rlc_um_for_drb) nr_drb_config(rlc_Config_drb, NR_RLC_Config_PR_um_Bi_Directional);
   else                    nr_drb_config(rlc_Config_drb, NR_RLC_Config_PR_am);
 
-
+  
   rlc_BearerConfig_drb->rlc_Config                                 = rlc_Config_drb;
   logicalChannelConfig_drb                                             = calloc(1, sizeof(NR_LogicalChannelConfig_t));
   logicalChannelConfig_drb->ul_SpecificParameters                      = calloc(1, sizeof(*logicalChannelConfig_drb->ul_SpecificParameters));
@@ -2547,18 +2547,19 @@ uint8_t do_RRCReestablishmentRequest(uint8_t Mod_id, uint8_t *buffer, uint16_t c
 
 //------------------------------------------------------------------------------
 uint8_t
-do_RRCReestablishment(const protocol_ctxt_t     *const ctxt_pP,
-                      rrc_gNB_ue_context_t      *const ue_context_pP,
-                      int                              CC_id,
-                      uint8_t                   *const buffer,
-                      //const uint8_t                    transmission_mode,
-                      const uint8_t                    Transaction_id,
-                      NR_SRB_ToAddModList_t               **SRB_configList,
-                      OCTET_STRING_t               *masterCellGroup_from_DU,
-                      NR_ServingCellConfigCommon_t *scc,
-                      rrc_gNB_carrier_data_t *carrier)
-//------------------------------------------------------------------------------
-{
+do_RRCReestablishment(
+const protocol_ctxt_t     *const ctxt_pP,
+rrc_gNB_ue_context_t      *const ue_context_pP,
+int                              CC_id,
+uint8_t                   *const buffer,
+size_t                           buffer_size,
+//const uint8_t                    transmission_mode,
+const uint8_t                    Transaction_id,
+NR_SRB_ToAddModList_t               **SRB_configList,
+OCTET_STRING_t               *masterCellGroup_from_DU,
+NR_ServingCellConfigCommon_t *scc,
+rrc_gNB_carrier_data_t *carrier
+) {
     asn_enc_rval_t enc_rval;
     //long *logicalchannelgroup = NULL;
     struct NR_SRB_ToAddMod *SRB1_config = NULL;
@@ -2628,8 +2629,8 @@ do_RRCReestablishment(const protocol_ctxt_t     *const ctxt_pP,
 		  &asn_DEF_NR_CellGroupConfig,   //might be added prefix later
 		  (void **)&cellGroupConfig,
 		  (uint8_t *)masterCellGroup_from_DU->buf,
-		  masterCellGroup_from_DU->size, 0, 0); 
-      
+		  masterCellGroup_from_DU->size, 0, 0);
+
       xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void*)cellGroupConfig);
     }
     else {
@@ -2641,7 +2642,7 @@ do_RRCReestablishment(const protocol_ctxt_t     *const ctxt_pP,
 				       (void *)cellGroupConfig,
 				       masterCellGroup_buf,
 				       1000);
-      
+
       if(enc_rval.encoded == -1) {
         LOG_E(NR_RRC, "ASN1 message CellGroupConfig encoding failed (%s, %lu)!\n",
 	      enc_rval.failed_type->name, enc_rval.encoded);
