@@ -100,10 +100,10 @@ void dump_mac_stats(gNB_MAC_INST *gNB, char *output, int strlen, bool reset_rsrp
                     UE_info->UE_sched_ctrl[UE_id].CSI_report.cri_ri_li_pmi_cqi_report.pmi_x1,
                     UE_info->UE_sched_ctrl[UE_id].CSI_report.cri_ri_li_pmi_cqi_report.pmi_x2);
 
-    stroff+=sprintf(output+stroff,"UE %d: dlsch_rounds %"PRIu64"/%"PRIu64"/%"PRIu64"/%"PRIu64", dlsch_errors %"PRIu64", pucch0_DTX %d, BLER %.5f MCS %d\n",
-                    UE_id,
-                    stats->dlsch_rounds[0], stats->dlsch_rounds[1],
-                    stats->dlsch_rounds[2], stats->dlsch_rounds[3],
+    stroff+=sprintf(output+stroff,"UE %d: dlsch_rounds ", UE_id);
+    for (int i=0; i<gNB->harq_round_max; i++)
+      stroff+=sprintf(output+stroff,"%"PRIu64"/", stats->dlsch_rounds[i]);
+    stroff+=sprintf(output+stroff," dlsch_errors %"PRIu64", pucch0_DTX %d, BLER %.5f MCS %d\n",
                     stats->dlsch_errors,
                     stats->pucch0_DTX,
                     sched_ctrl->dl_bler_stats.bler,
@@ -113,10 +113,10 @@ void dump_mac_stats(gNB_MAC_INST *gNB, char *output, int strlen, bool reset_rsrp
       stats->cumul_rsrp = 0;
     }
     stroff+=sprintf(output+stroff,"UE %d: dlsch_total_bytes %"PRIu64"\n", UE_id, stats->dlsch_total_bytes);
-    stroff+=sprintf(output+stroff,"UE %d: ulsch_rounds %"PRIu64"/%"PRIu64"/%"PRIu64"/%"PRIu64", ulsch_DTX %d, ulsch_errors %"PRIu64"\n",
-                    UE_id,
-                    stats->ulsch_rounds[0], stats->ulsch_rounds[1],
-                    stats->ulsch_rounds[2], stats->ulsch_rounds[3],
+    stroff+=sprintf(output+stroff,"UE %d: ulsch_rounds ", UE_id);
+    for (int i=0; i<gNB->harq_round_max; i++)
+      stroff+=sprintf(output+stroff,"%"PRIu64"/", stats->ulsch_rounds[i]);
+    stroff+=sprintf(output+stroff," ulsch_DTX %d, ulsch_errors %"PRIu64"\n",
                     stats->ulsch_DTX,
                     stats->ulsch_errors);
     stroff+=sprintf(output+stroff,

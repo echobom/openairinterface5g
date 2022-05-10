@@ -161,8 +161,6 @@ typedef struct {
   //uint8_t num_cba_dci[10];
   /// allocated CBA RNTI
   //uint16_t cba_rnti[4];//NUM_MAX_CBA_GROUP];
-  /// UL max-harq-retransmission
-  uint16_t Mlimit;
 } NR_UE_ULSCH_t;
 
 typedef struct {
