@@ -75,10 +75,9 @@ void dump_mac_stats(gNB_MAC_INST *gNB, char *output, int strlen, bool reset_rsrp
 {
   NR_UE_info_t *UE_info = &gNB->UE_info;
   int num = 1;
- 
+
   int stroff=0;
   if (UE_info->num_UEs == 0) return;
-
   for (int UE_id = UE_info->list.head; UE_id >= 0; UE_id = UE_info->list.next[UE_id]) {
 
     const NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];

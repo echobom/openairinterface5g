@@ -345,8 +345,6 @@ typedef struct {
 typedef struct {
   /// Pointers to 16 HARQ processes for the ULSCH
   NR_UL_gNB_HARQ_t *harq_processes[NR_MAX_ULSCH_HARQ_PROCESSES];
-  /// Current HARQ process id
-  int harq_process_id[NR_MAX_SLOTS_PER_FRAME];
   /// HARQ process mask, indicates which processes are currently active
   uint16_t harq_mask;
   /// ACK/NAK Bundling flag

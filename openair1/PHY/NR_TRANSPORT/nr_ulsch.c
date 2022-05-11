@@ -68,7 +68,6 @@ void nr_fill_ulsch(PHY_VARS_gNB *gNB,
   ulsch->rnti = ulsch_pdu->rnti;
   //ulsch->rnti_type;
   ulsch->harq_mask |= 1<<harq_pid;
-  ulsch->harq_process_id[slot] = harq_pid;
 
   ulsch->harq_processes[harq_pid]->frame=frame;
   ulsch->harq_processes[harq_pid]->slot=slot;

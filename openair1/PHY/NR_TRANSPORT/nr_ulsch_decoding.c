@@ -136,7 +136,6 @@ void clean_gNB_ulsch(NR_gNB_ULSCH_t *ulsch)
     ulsch->cooperation_flag = 0;
     ulsch->max_ldpc_iterations = 0;
     ulsch->last_iteration_cnt = 0;
-    for (i=0;i<NR_MAX_SLOTS_PER_FRAME;i++) ulsch->harq_process_id[i] = 0;
 
     for (i=0; i<NR_MAX_ULSCH_HARQ_PROCESSES; i++) {
       if (ulsch->harq_processes[i]){
