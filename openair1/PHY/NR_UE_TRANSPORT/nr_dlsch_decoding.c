@@ -140,7 +140,6 @@ NR_UE_DLSCH_t *new_nr_ue_dlsch(uint8_t Kmimo,uint8_t Mdlharq,uint32_t Nsoft,uint
     dlsch->Mdlharq = Mdlharq;
     dlsch->number_harq_processes_for_pdsch = Mdlharq;
     dlsch->Nsoft = Nsoft;
-    dlsch->Mlimit = 4;
     dlsch->max_ldpc_iterations = max_ldpc_iterations;
 
     for (int i=0; i<Mdlharq; i++) {

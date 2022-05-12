@@ -739,7 +739,8 @@ void nr_set_pusch_semi_static(const NR_SIB1_t *sib1,
 
 #define BLER_UPDATE_FRAME 10
 #define BLER_FILTER 0.9f
-int get_mcs_from_bler(const NR_bler_options_t *bler_options,
+int get_mcs_from_bler(int max_harq_rounds,
+                      const NR_bler_options_t *bler_options,
                       const NR_mac_dir_stats_t *stats,
                       NR_bler_stats_t *bler_stats,
                       int max_mcs,
@@ -762,7 +763,7 @@ int get_mcs_from_bler(const NR_bler_options_t *bler_options,
 
   // last update is longer than x frames ago
   const int dtx = (int)(stats->rounds[0] - bler_stats->rounds[0]);
-  const int dretx = (int)(stats->rounds[1] - bler_stats->rounds[1]);
+  const int dretx = (max_harq_rounds>1) ? (int)(stats->rounds[1] - bler_stats->rounds[1]) : 0;
   const float bler_window = dtx > 0 ? (float) dretx / dtx : bler_stats->bler;
   bler_stats->bler = BLER_FILTER * bler_stats->bler + (1 - BLER_FILTER) * bler_window;
 

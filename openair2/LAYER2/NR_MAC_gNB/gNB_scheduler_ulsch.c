@@ -1209,7 +1209,7 @@ void pf_ul(module_id_t module_id,
 
     const NR_bler_options_t *bo = &nrmac->ul_bler;
     const int max_mcs = bo->max_mcs; /* no per-user maximum MCS yet */
-    sched_pusch->mcs = get_mcs_from_bler(bo, stats, &sched_ctrl->ul_bler_stats, max_mcs, frame);
+    sched_pusch->mcs = get_mcs_from_bler(nrmac->harq_round_max, bo, stats, &sched_ctrl->ul_bler_stats, max_mcs, frame);
 
     /* Schedule UE on SR or UL inactivity and no data (otherwise, will be scheduled
      * based on data to transmit) */

@@ -304,9 +304,7 @@ typedef struct {
   /// Maximum number of LDPC iterations
   uint8_t max_ldpc_iterations;
   /// number of iterations used in last turbo decoding
-  uint8_t last_iteration_cnt;  
-  /// Maximum number of HARQ rounds 
-  uint8_t Mlimit;
+  uint8_t last_iteration_cnt;
 } NR_UE_DLSCH_t;
 
 typedef enum {format0_0,

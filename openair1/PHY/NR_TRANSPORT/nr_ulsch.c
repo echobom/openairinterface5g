@@ -71,8 +71,17 @@ void nr_fill_ulsch(PHY_VARS_gNB *gNB,
 
   ulsch->harq_processes[harq_pid]->frame=frame;
   ulsch->harq_processes[harq_pid]->slot=slot;
-  ulsch->harq_processes[harq_pid]->handled= 0;
+  ulsch->harq_processes[harq_pid]->handled = 0;
   ulsch->harq_processes[harq_pid]->status= NR_ACTIVE;
+  if (ulsch->harq_processes[harq_pid]->ndi != ulsch_pdu->pusch_data.new_data_indicator) {
+    ulsch->harq_processes[harq_pid]->new_rx = true;
+    ulsch->harq_processes[harq_pid]->ndi = ulsch_pdu->pusch_data.new_data_indicator;
+    ulsch->harq_processes[harq_pid]->round = 0;
+  }
+  else {
+    ulsch->harq_processes[harq_pid]->new_rx = false;
+    ulsch->harq_processes[harq_pid]->round++;
+  }
   memcpy((void*)&ulsch->harq_processes[harq_pid]->ulsch_pdu, (void*)ulsch_pdu, sizeof(nfapi_nr_pusch_pdu_t));
 
   LOG_D(PHY,"Initializing nFAPI for ULSCH, UE %d, harq_pid %d\n",ulsch_id,harq_pid);
