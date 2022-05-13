@@ -196,18 +196,10 @@ void fill_default_nsa_downlinkBWP(NR_BWP_Downlink_t *bwp,
   bwp->bwp_Common->pdsch_ConfigCommon->choice.setup = calloc(1,sizeof(*bwp->bwp_Common->pdsch_ConfigCommon->choice.setup));
   bwp->bwp_Common->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList = calloc(1,sizeof(*bwp->bwp_Common->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList));
 
-  // copy PDSCH TimeDomainResourceAllocation from InitialBWP
-  NR_PDSCH_TimeDomainResourceAllocation_t *pdschi;
-  for (int i=0;i<servingcellconfigcommon->downlinkConfigCommon->initialDownlinkBWP->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList->list.count;i++) {
-    pdschi= calloc(1,sizeof(*pdschi));
-    if(servingcellconfigcommon->downlinkConfigCommon->initialDownlinkBWP->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList->list.array[i]->k0){
-      pdschi->k0 = calloc(1,sizeof(*pdschi->k0));
-      *pdschi->k0 = *servingcellconfigcommon->downlinkConfigCommon->initialDownlinkBWP->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList->list.array[i]->k0;
-    }
-    pdschi->mappingType = servingcellconfigcommon->downlinkConfigCommon->initialDownlinkBWP->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList->list.array[i]->mappingType;
-    pdschi->startSymbolAndLength = servingcellconfigcommon->downlinkConfigCommon->initialDownlinkBWP->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList->list.array[i]->startSymbolAndLength;
-    ASN_SEQUENCE_ADD(&bwp->bwp_Common->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList->list,pdschi);
-  }
+  // Prepare PDSCH-TimeDomainResourceAllocation list
+  nr_rrc_config_dl_tda(servingcellconfigcommon,
+                       bwp->bwp_Common->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList,
+                       curr_bwp);
 
   /// BWP dedicated configuration
 
@@ -654,8 +646,8 @@ void fill_default_secondaryCellGroup(NR_ServingCellConfigCommon_t *servingcellco
                                      int scg_id,
                                      int servCellIndex,
                                      const gNB_RrcConfigurationReq *configuration,
-                                     int uid)
-{
+                                     int uid) {
+
   const rrc_pdsch_AntennaPorts_t* pdschap = &configuration->pdsch_AntennaPorts;
   const int dl_antenna_ports = pdschap->N1 * pdschap->N2 * pdschap->XP;
   const int do_csirs = configuration->do_CSIRS;
@@ -1042,12 +1034,14 @@ void fill_default_secondaryCellGroup(NR_ServingCellConfigCommon_t *servingcellco
   pusch_Config->codebookSubset=calloc(1,sizeof(*pusch_Config->codebookSubset));
   *pusch_Config->codebookSubset = NR_PUSCH_Config__codebookSubset_nonCoherent;
   pusch_Config->maxRank=calloc(1,sizeof(*pusch_Config->maxRank));
-  *pusch_Config->maxRank= 1;
+  *pusch_Config->maxRank= configuration->pusch_AntennaPorts;
   pusch_Config->rbg_Size=NULL;
   pusch_Config->uci_OnPUSCH=NULL;
   pusch_Config->tp_pi2BPSK=NULL;
 
-  uint8_t transform_precoding = NR_PUSCH_Config__transformPrecoder_disabled;
+  /*------------------------------TRANSFORM PRECODING- -----------------------------------------------------------------------*/
+
+  uint8_t transformPrecoder = NR_PUSCH_Config__transformPrecoder_disabled;
 
   // TBD: configure this from .conf file, Dedicated params cannot yet be configured in .conf file.
   // Enable this to test transform precoding enabled from dedicated config.
@@ -1059,12 +1053,13 @@ void fill_default_secondaryCellGroup(NR_ServingCellConfigCommon_t *servingcellco
 
   if (pusch_Config->transformPrecoder == NULL) {
     if (servingcellconfigcommon->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->msg3_transformPrecoder != NULL)
-      transform_precoding = NR_PUSCH_Config__transformPrecoder_enabled;
-  } else {
-    transform_precoding = *pusch_Config->transformPrecoder;
+      transformPrecoder = NR_PUSCH_Config__transformPrecoder_enabled;
   }
+  else
+    transformPrecoder = *pusch_Config->transformPrecoder;
 
-  if (transform_precoding == NR_PUSCH_Config__transformPrecoder_enabled) {
+
+  if (transformPrecoder == NR_PUSCH_Config__transformPrecoder_enabled ) {
     /* Enable DMRS uplink config for transform precoding enabled */
     NR_DMRS_UplinkConfig->transformPrecodingEnabled = calloc(1,sizeof(*NR_DMRS_UplinkConfig->transformPrecodingEnabled));
     NR_DMRS_UplinkConfig->transformPrecodingEnabled->nPUSCH_Identity = NULL;
@@ -1227,6 +1222,7 @@ void fill_default_secondaryCellGroup(NR_ServingCellConfigCommon_t *servingcellco
  NR_CSI_MeasConfig_t *csi_MeasConfig = calloc(1,sizeof(*csi_MeasConfig));
  secondaryCellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig->choice.setup = csi_MeasConfig;
 
+  int curr_bwp = NRRIV2BW(PRBalloc_to_locationandbandwidth(servingcellconfigcommon->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth,0),275);
  config_csirs(servingcellconfigcommon, csi_MeasConfig, uid, dl_antenna_ports, curr_bwp, do_csirs);
  config_csiim(do_csirs, dl_antenna_ports, curr_bwp, csi_MeasConfig);
 

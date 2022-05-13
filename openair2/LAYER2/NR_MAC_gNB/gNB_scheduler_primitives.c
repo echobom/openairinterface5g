@@ -145,6 +145,30 @@ uint8_t set_dl_nrOfLayers(NR_UE_sched_ctrl_t *sched_ctrl) {
 
 }
 
+
+uint16_t set_pm_index(NR_UE_sched_ctrl_t *sched_ctrl,
+                      int layers,
+                      int N1, int N2,
+                      int xp_pdsch_antenna_ports,
+                      int codebook_mode) {
+
+  int antenna_ports = (N1*N2)<<1;
+  if (xp_pdsch_antenna_ports == 1 &&
+      antenna_ports>1)
+    return 0; //identity matrix (basic 5G configuration handled by PMI report is with XP antennas)
+
+  int x1 = sched_ctrl->CSI_report.cri_ri_li_pmi_cqi_report.pmi_x1;
+  int x2 = sched_ctrl->CSI_report.cri_ri_li_pmi_cqi_report.pmi_x2;
+  LOG_D(NR_MAC,"PMI report: x1 %d x2 %d\n",x1,x2);
+
+  sched_ctrl->set_pmi = false;
+
+  if (antenna_ports == 2)
+    return x2;
+  else
+    AssertFatal(1==0,"More than 2 antenna ports not yet supported\n");
+}
+
 uint8_t get_mcs_from_cqi(int mcs_table, int cqi_table, int cqi_idx)
 {
   if (cqi_idx <= 0) {
@@ -185,6 +209,7 @@ uint8_t get_mcs_from_cqi(int mcs_table, int cqi_table, int cqi_idx)
   LOG_E(NR_MAC, "could not find maximum MCS from cqi_idx %d, default to 9\n", cqi_idx);
   return 9;
 }
+
 
 void set_dl_dmrs_ports(NR_pdsch_semi_static_t *ps) {
 
@@ -598,23 +623,21 @@ void nr_set_pdsch_semi_static(const NR_SIB1_t *sib1,
   NR_PDSCH_Config_t *pdsch_Config = NULL;
   if (bwpd && bwpd->pdsch_Config) pdsch_Config = bwpd->pdsch_Config->choice.setup;
   LOG_D(NR_MAC,"tda %d, ps->time_domain_allocation %d,layers %d, ps->nrOfLayers %d, pdsch_config %p\n",tda,ps->time_domain_allocation,layers,ps->nrOfLayers,pdsch_Config);
-  if (ps->time_domain_allocation != tda) {
-    reset_dmrs = true;
-    ps->time_domain_allocation = tda;
-    NR_PDSCH_TimeDomainResourceAllocationList_t *tdaList = get_pdsch_TimeDomainAllocationList(bwp, scc, sib1);
-    AssertFatal(tda < tdaList->list.count, "time_domain_allocation %d>=%d\n", tda, tdaList->list.count);
-    ps->mapping_type = tdaList->list.array[tda]->mappingType;
-    if (pdsch_Config) {
-      if (ps->mapping_type == NR_PDSCH_TimeDomainResourceAllocation__mappingType_typeB)
-        ps->dmrsConfigType = pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeB->choice.setup->dmrs_Type == NULL ? 0 : 1;
-      else
-        ps->dmrsConfigType = pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->dmrs_Type == NULL ? 0 : 1;
-    }
+  reset_dmrs = true;
+  ps->time_domain_allocation = tda;
+  NR_PDSCH_TimeDomainResourceAllocationList_t *tdaList = get_pdsch_TimeDomainAllocationList(bwp, scc, sib1);
+  AssertFatal(tda < tdaList->list.count, "time_domain_allocation %d>=%d\n", tda, tdaList->list.count);
+  ps->mapping_type = tdaList->list.array[tda]->mappingType;
+  if (pdsch_Config) {
+    if (ps->mapping_type == NR_PDSCH_TimeDomainResourceAllocation__mappingType_typeB)
+      ps->dmrsConfigType = pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeB->choice.setup->dmrs_Type == NULL ? 0 : 1;
     else
-      ps->dmrsConfigType = NFAPI_NR_DMRS_TYPE1;
-    const int startSymbolAndLength = tdaList->list.array[tda]->startSymbolAndLength;
-    SLIV2SL(startSymbolAndLength, &ps->startSymbolIndex, &ps->nrOfSymbols);
+      ps->dmrsConfigType = pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->dmrs_Type == NULL ? 0 : 1;
   }
+  else
+    ps->dmrsConfigType = NFAPI_NR_DMRS_TYPE1;
+  const int startSymbolAndLength = tdaList->list.array[tda]->startSymbolAndLength;
+  SLIV2SL(startSymbolAndLength, &ps->startSymbolIndex, &ps->nrOfSymbols);
 
   const long f = ((bwp || bwpd) &&
                   sched_ctrl->search_space &&
@@ -662,7 +685,9 @@ void nr_set_pusch_semi_static(const NR_SIB1_t *sib1,
                               long dci_format,
                               int tda,
                               uint8_t num_dmrs_cdm_grps_no_data,
+                              uint8_t nrOfLayers,
                               NR_pusch_semi_static_t *ps) {
+
   ps->dci_format = dci_format;
   ps->time_domain_allocation = tda;
 
@@ -704,6 +729,7 @@ void nr_set_pusch_semi_static(const NR_SIB1_t *sib1,
     num_dmrs_cdm_grps_no_data = 2; // in case of transform precoding - no Data sent in DMRS symbol
   }
 
+  ps->nrOfLayers = nrOfLayers;
   ps->num_dmrs_cdm_grps_no_data = num_dmrs_cdm_grps_no_data;
 
   /* DMRS calculations */
@@ -1049,8 +1075,16 @@ void config_uldci(const NR_SIB1_t *sib1,
                     "Non Codebook configuration non supported\n");
         dci_pdu_rel15->srs_resource_indicator.val = 0; // taking resource 0 for SRS
       }
+      dci_pdu_rel15->precoding_information.val= 0;
+      if (pusch_pdu->nrOfLayers == 2)
+        dci_pdu_rel15->precoding_information.val = 4;
+      else if (pusch_pdu->nrOfLayers == 4)
+        dci_pdu_rel15->precoding_information.val = 11;
+
+      // antenna_ports.val = 0 for transform precoder is disabled, dmrs-Type=1, maxLength=1, Rank=1/2/3/4
       // Antenna Ports
-      dci_pdu_rel15->antenna_ports.val = 0; // TODO for now it is hardcoded, it should depends on cdm group no data and rank
+      dci_pdu_rel15->antenna_ports.val = 0;
+
       // DMRS sequence initialization
       dci_pdu_rel15->dmrs_sequence_initialization.val = pusch_pdu->scid;
       break;
@@ -1059,11 +1093,14 @@ void config_uldci(const NR_SIB1_t *sib1,
   }
 
   LOG_D(NR_MAC,
-        "%s() ULDCI type 0 payload: freq_alloc %d, time_alloc %d, freq_hop_flag %d, mcs %d tpc %d ndi %d rv %d\n",
+        "%s() ULDCI type 0 payload: dci_format %d, freq_alloc %d, time_alloc %d, freq_hop_flag %d, precoding_information.val %d antenna_ports.val %d mcs %d tpc %d ndi %d rv %d\n",
         __func__,
+        dci_format,
         dci_pdu_rel15->frequency_domain_assignment.val,
         dci_pdu_rel15->time_domain_assignment.val,
         dci_pdu_rel15->frequency_hopping_flag.val,
+        dci_pdu_rel15->precoding_information.val,
+        dci_pdu_rel15->antenna_ports.val,
         dci_pdu_rel15->mcs,
         dci_pdu_rel15->tpc,
         dci_pdu_rel15->ndi,
@@ -1526,12 +1563,13 @@ void fill_dci_pdu_rel15(const NR_ServingCellConfigCommon_t *scc,
                         int rnti_type,
                         int N_RB,
                         int bwp_id,
+                        NR_ControlResourceSetId_t coreset_id,
                         uint16_t cset0_bwp_size) {
   uint8_t fsize = 0, pos = 0;
 
   uint64_t *dci_pdu = (uint64_t *)pdcch_dci_pdu->Payload;
   *dci_pdu=0;
-  int dci_size = nr_dci_size(scc->downlinkConfigCommon->initialDownlinkBWP,scc->uplinkConfigCommon->initialUplinkBWP, CellGroup, dci_pdu_rel15, dci_format, rnti_type, N_RB, bwp_id, cset0_bwp_size);
+  int dci_size = nr_dci_size(scc->downlinkConfigCommon->initialDownlinkBWP,scc->uplinkConfigCommon->initialUplinkBWP, CellGroup, dci_pdu_rel15, dci_format, rnti_type, N_RB, bwp_id, coreset_id, cset0_bwp_size);
   pdcch_dci_pdu->PayloadSizeBits = dci_size;
   AssertFatal(dci_size <= 64, "DCI sizes above 64 bits not yet supported");
   if (dci_format == NR_DL_DCI_FORMAT_1_1 || dci_format == NR_UL_DCI_FORMAT_0_1)
@@ -2362,6 +2400,7 @@ int add_new_nr_ue(module_id_t mod_idP, rnti_t rntiP, NR_CellGroupConfig_t *CellG
     NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl[UE_id];
     memset(sched_ctrl, 0, sizeof(*sched_ctrl));
     sched_ctrl->dl_max_mcs = 28; /* do not limit MCS for individual UEs */
+    sched_ctrl->set_pmi = false;
     sched_ctrl->ta_frame = 0;
     sched_ctrl->ta_update = 31;
     sched_ctrl->ta_apply = false;
@@ -2923,6 +2962,7 @@ void nr_mac_update_timers(module_id_t module_id,
 
         int dci_format = get_dci_format(sched_ctrl);
         const uint8_t num_dmrs_cdm_grps_no_data = (ubwp || ubwpd) ? 1 : 2;
+        const uint8_t nrOfLayers = 1;
         const int utda = ubwp && preferred_ul_tda[ubwp->bwp_Id][slot] >= 0 ?
             preferred_ul_tda[ubwp->bwp_Id][slot] : (ups->time_domain_allocation >= 0 ? ups->time_domain_allocation : 0);
 
@@ -2933,6 +2973,7 @@ void nr_mac_update_timers(module_id_t module_id,
                                  dci_format,
                                  utda,
                                  num_dmrs_cdm_grps_no_data,
+                                 nrOfLayers,
                                  ups);
       }
     }

@@ -42,7 +42,7 @@ void process_CellGroup(NR_CellGroupConfig_t *CellGroup, NR_UE_sched_ctrl_t *sche
 
 void config_common(int Mod_idP,
                    int ssb_SubcarrierOffset,
-                   rrc_pdsch_AntennaPorts_t pdsch_AntennaPorts,
+                   int pdsch_AntennaPorts,
                    int pusch_AntennaPorts,
                    NR_ServingCellConfigCommon_t *scc);
 
@@ -307,6 +307,7 @@ void fill_dci_pdu_rel15(const NR_ServingCellConfigCommon_t *scc,
                         int rnti_types,
                         int N_RB,
                         int bwp_id,
+                        NR_ControlResourceSetId_t coreset_id,
                         uint16_t cset0_bwp_size);
 
 void prepare_dci(const NR_CellGroupConfig_t *CellGroup,
@@ -370,6 +371,7 @@ void nr_set_pusch_semi_static(const NR_SIB1_t *sib1,
                               long dci_format,
                               int tda,
                               uint8_t num_dmrs_cdm_grps_no_data,
+                              uint8_t nrOfLayers,
                               NR_pusch_semi_static_t *ps);
 
 uint16_t get_Y(int cid, int slot, rnti_t rnti);
@@ -505,6 +507,12 @@ int16_t ssb_index_from_prach(module_id_t module_idP,
 void find_SSB_and_RO_available(module_id_t module_idP);
 
 void set_dl_dmrs_ports(NR_pdsch_semi_static_t *ps);
+
+uint16_t set_pm_index(NR_UE_sched_ctrl_t *sched_ctrl,
+                      int layers,
+                      int N1, int N2,
+                      int xp_pdsch_antenna_ports,
+                      int codebook_mode);
 
 uint8_t get_mcs_from_cqi(int mcs_table, int cqi_table, int cqi_idx);
 

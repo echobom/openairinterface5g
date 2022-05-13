@@ -1169,7 +1169,18 @@ void nr_schedule_ue_spec(module_id_t module_id,
     // Resource Allocation in time domain
     pdsch_pdu->StartSymbolIndex = ps->startSymbolIndex;
     pdsch_pdu->NrOfSymbols = ps->nrOfSymbols;
-
+    // Precoding
+    if (sched_ctrl->set_pmi) {
+      int report_id = sched_ctrl->CSI_report.cri_ri_li_pmi_cqi_report.csi_report_id;
+      nr_csi_report_t *csi_report = &UE_info->csi_report_template[UE_id][report_id];
+      pdsch_pdu->precodingAndBeamforming.prg_size = pdsch_pdu->rbSize;
+      pdsch_pdu->precodingAndBeamforming.prgs_list[0].pm_idx = set_pm_index(sched_ctrl,
+                                                                            nrOfLayers,
+                                                                            csi_report->N1,
+                                                                            csi_report->N2,
+                                                                            gNB_mac->xp_pdsch_antenna_ports,
+                                                                            csi_report->codebook_mode);
+    }
     // TBS_LBRM according to section 5.4.2.1 of 38.212
     long *maxMIMO_Layers = cg->spCellConfig->spCellConfigDedicated->pdsch_ServingCellConfig->choice.setup->ext1->maxMIMO_Layers;
     AssertFatal (maxMIMO_Layers != NULL,"Option with max MIMO layers not configured is not supported\n");
@@ -1258,13 +1269,14 @@ void nr_schedule_ue_spec(module_id_t module_id,
     dci_payload.dmrs_sequence_initialization.val = pdsch_pdu->SCID;
     LOG_D(NR_MAC,
           "%4d.%2d DCI type 1 payload: freq_alloc %d (%d,%d,%d), "
-          "time_alloc %d, vrb to prb %d, mcs %d tb_scaling %d ndi %d rv %d tpc %d ti %d\n",
+          "nrOfLayers %d, time_alloc %d, vrb to prb %d, mcs %d tb_scaling %d ndi %d rv %d tpc %d ti %d\n",
           frame,
           slot,
           dci_payload.frequency_domain_assignment.val,
           pdsch_pdu->rbStart,
           pdsch_pdu->rbSize,
           pdsch_pdu->BWPSize,
+          pdsch_pdu->nrOfLayers,
           dci_payload.time_domain_assignment.val,
           dci_payload.vrb_to_prb_mapping.val,
           dci_payload.mcs,
@@ -1286,6 +1298,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
                        rnti_type,
                        pdsch_pdu->BWPSize,
                        bwp ? bwp->bwp_Id : 0,
+                       coresetid,
                        gNB_mac->cset0_bwp_size);
 
     LOG_D(NR_MAC,
