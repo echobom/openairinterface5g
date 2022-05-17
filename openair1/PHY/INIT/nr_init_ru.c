@@ -63,9 +63,6 @@ int nr_phy_init_RU(RU_t *ru) {
       ru->common.txdata[i]  = (int32_t*)malloc16_clear( ru->sf_extension + (fp->samples_per_frame*sizeof(int32_t) ));
       LOG_I(PHY,"[INIT] common.txdata[%d] = %p (%lu bytes,sf_extension %d)\n",i,ru->common.txdata[i],
 	     (ru->sf_extension + fp->samples_per_frame)*sizeof(int32_t),ru->sf_extension);
-      ru->common.txdata[i] =  &ru->common.txdata[i][ru->sf_extension];
-
-      LOG_I(PHY,"[INIT] common.txdata[%d] = %p \n",i,ru->common.txdata[i]);
 
     }
     for (i=0;i<ru->nb_rx;i++) {
@@ -197,8 +194,10 @@ void nr_phy_free_RU(RU_t *ru)
     free_and_zero(ru->common.txdataF_BF);
 
     // free FFT output buffers (RX)
-    for (i = 0; i < ru->nb_rx; i++) free_and_zero(ru->common.rxdataF[i]);
-    free_and_zero(ru->common.rxdataF);
+    // HACK: cannot free here, or the gNB code in phy_free_nr_gNB() will
+    // segfault. The rxdataF memory between RU and gNB is not properly handled!
+    //for (i = 0; i < ru->nb_rx; i++) free_and_zero(ru->common.rxdataF[i]);
+    //free_and_zero(ru->common.rxdataF);
 
     for (j=0;j<NUMBER_OF_NR_RU_PRACH_OCCASIONS_MAX;j++) {
       for (i = 0; i < ru->nb_rx; i++)
