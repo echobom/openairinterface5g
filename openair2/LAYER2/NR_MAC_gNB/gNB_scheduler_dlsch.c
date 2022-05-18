@@ -1142,6 +1142,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
     pdsch_pdu->CyclicPrefix = genericParameters->cyclicPrefix ? *genericParameters->cyclicPrefix : 0;
     // Codeword information
     pdsch_pdu->NrOfCodewords = 1;
+    //number of information bits per 1024 coded bits expressed in 0.1 bit units
     pdsch_pdu->targetCodeRate[0] = R;
     pdsch_pdu->qamModOrder[0] = Qm;
     pdsch_pdu->mcsIndex[0] = sched_pdsch->mcs;

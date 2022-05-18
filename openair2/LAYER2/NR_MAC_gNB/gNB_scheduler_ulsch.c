@@ -1610,7 +1610,7 @@ nr_pp_impl_ul nr_init_fr1_ulsch_preprocessor(module_id_t module_id, int CC_id)
       if (mcs > 27 && mcsTableIdx == 1)
         continue;
       const uint8_t Qm = nr_get_Qm_dl(mcs, mcsTableIdx);
-      const uint16_t R = nr_get_code_rate_dl(mcs, mcsTableIdx);
+      const uint16_t R = nr_get_code_rate_ul(mcs, mcsTableIdx);
       /* note: we do not update R/Qm based on low MCS or pi2BPSK */
       ul_pf_tbs[mcsTableIdx][mcs] = nr_compute_tbs(Qm,
                                                    R,
