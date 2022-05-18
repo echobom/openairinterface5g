@@ -70,11 +70,9 @@ void rxAddInput( const c16_t *input_sig,
   const double noise_per_sample = pow(10,channelDesc->noise_power_dB/10.0) * 256;
   const int dd = abs(channelDesc->channel_offset);
   const int nbTx=channelDesc->nb_tx;
-  const int dd = abs(channelDesc->channel_offset);
-  const int nbTx=channelDesc->nb_tx;
 
   for (int i=0; i<nbSamples; i++) {
-    struct complex16 *out_ptr=after_channel_sig+i;
+    struct c16_t *out_ptr=after_channel_sig+i;
     struct complexd rx_tmp= {0};
 
     for (int txAnt=0; txAnt < nbTx; txAnt++) {
