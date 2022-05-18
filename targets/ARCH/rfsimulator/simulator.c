@@ -527,7 +527,7 @@ static int rfsimu_getdistance_cmd(char *buff, int debug, telnet_printfunc_t prnt
 static int rfsimu_vtime_cmd(char *buff, int debug, telnet_printfunc_t prnt, void *arg)
 {
   rfsimulator_state_t *t = (rfsimulator_state_t *)arg;
-  const openair0_timestamp ts = t->nextTimestamp;
+  const openair0_timestamp ts = t->nextRxTstamp;
   const double sample_rate = t->sample_rate;
   prnt("vtime measurement: TS %llu sample_rate %.3f\n", ts, sample_rate);
   return CMDSTATUS_FOUND;
