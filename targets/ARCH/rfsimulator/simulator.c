@@ -483,7 +483,7 @@ static int rfsimu_setdistance_cmd(char *buff, int debug, telnet_printfunc_t prnt
     cd->channel_offset = new_offset;
 
     const int nbTx = cd->nb_tx;
-    rfsimu_offset_change_cirBuf(b->circularBuf, t->nextTimestamp, CirSize, old_offset, new_offset, nbTx);
+    rfsimu_offset_change_cirBuf(b->circularBuf, t->nextRxTstamp, CirSize, old_offset, new_offset, nbTx);
   }
 
   free(modelname);
