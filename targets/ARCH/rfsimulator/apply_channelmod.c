@@ -72,7 +72,7 @@ void rxAddInput( const c16_t *input_sig,
   const int nbTx=channelDesc->nb_tx;
 
   for (int i=0; i<nbSamples; i++) {
-    struct c16_t *out_ptr=after_channel_sig+i;
+    struct complex16 *out_ptr=after_channel_sig+i;
     struct complexd rx_tmp= {0};
 
     for (int txAnt=0; txAnt < nbTx; txAnt++) {
