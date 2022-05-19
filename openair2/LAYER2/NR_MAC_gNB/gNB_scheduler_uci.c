@@ -733,6 +733,15 @@ void nr_csi_meas_reporting(int Mod_idP,
     for (int csi_report_id = 0; csi_report_id < csi_measconfig->csi_ReportConfigToAddModList->list.count; csi_report_id++){
       NR_CSI_ReportConfig_t *csirep = csi_measconfig->csi_ReportConfigToAddModList->list.array[csi_report_id];
 
+      int ubwp_Id = 0;
+      if (sched_ctrl->active_ubwp) {
+        ubwp_Id = sched_ctrl->active_ubwp->bwp_Id;
+      }
+
+      if (csirep->reportConfigType.choice.periodic->pucch_CSI_ResourceList.list.array[0]->uplinkBandwidthPartId != ubwp_Id) {
+        continue;
+      }
+
       AssertFatal(csirep->reportConfigType.choice.periodic,
                   "Only periodic CSI reporting is implemented currently\n");
       int period, offset;
