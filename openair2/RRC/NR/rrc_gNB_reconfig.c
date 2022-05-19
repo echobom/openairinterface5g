@@ -509,8 +509,7 @@ void fill_default_nsa_uplinkBWP(NR_BWP_Uplink_t *ubwp,
   }
   NR_DMRS_UplinkConfig_t *NR_DMRS_UplinkConfig = pusch_Config->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup;
   NR_DMRS_UplinkConfig->dmrs_Type = NULL;
-  NR_DMRS_UplinkConfig->dmrs_AdditionalPosition = calloc(1,sizeof(*NR_DMRS_UplinkConfig->dmrs_AdditionalPosition));
-  *NR_DMRS_UplinkConfig->dmrs_AdditionalPosition = NR_DMRS_UplinkConfig__dmrs_AdditionalPosition_pos0;
+  NR_DMRS_UplinkConfig->dmrs_AdditionalPosition = NULL;
   if (!servingcellconfigdedicated) {
     NR_DMRS_UplinkConfig->phaseTrackingRS=NULL;
   }
@@ -989,8 +988,7 @@ void fill_default_secondaryCellGroup(NR_ServingCellConfigCommon_t *servingcellco
   }
   NR_DMRS_UplinkConfig_t *NR_DMRS_UplinkConfig = pusch_Config->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup;
   NR_DMRS_UplinkConfig->dmrs_Type = NULL;
-  NR_DMRS_UplinkConfig->dmrs_AdditionalPosition = calloc(1,sizeof(*NR_DMRS_UplinkConfig->dmrs_AdditionalPosition));
-  *NR_DMRS_UplinkConfig->dmrs_AdditionalPosition = NR_DMRS_UplinkConfig__dmrs_AdditionalPosition_pos0;
+  NR_DMRS_UplinkConfig->dmrs_AdditionalPosition = NULL;
   if (!servingcellconfigdedicated) {
     NR_DMRS_UplinkConfig->phaseTrackingRS=NULL;
   }
