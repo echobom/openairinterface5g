@@ -245,8 +245,8 @@ set(CMAKE_CXX_FLAGS
 
 add_boolean_option(SANITIZE_ADDRESS False "enable the address sanitizer (ASan)")
 if (SANITIZE_ADDRESS)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-common")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-common")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address  -fsanitize=undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-common")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address  -fsanitize=undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-common")
 endif ()
 
 add_definitions("-DASN_DISABLE_OER_SUPPORT")
